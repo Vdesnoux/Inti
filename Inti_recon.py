@@ -164,7 +164,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         logme('Erreur ouverture fichier : '+serfile)
         
     FrameCount = scan.getLength()    #      return number of frame in SER file.
-    Width = int(scan.getWidth())     #      return width of a frame, int est uint64
+    Width = int(scan.getWidth())    #      return width of a frame, int est uint64
     Height = int(scan.getHeight())   #      return height of a frame, int car est uint64
     dateSerUTC = scan.getHeader()['DateTimeUTC']  
     dateSer=scan.getHeader()['DateTime']
@@ -276,7 +276,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
 
     """
     ---------------------------------------------------------------------------
-    lecture fichier ser et accumulation pour moyenne
+    #---- lecture fichier ser et accumulation pour moyenne
     ---------------------------------------------------------------------------
     """
     data_offset = 178
@@ -344,7 +344,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
 
     """
     ---------------------------------------------------------------------------
-    Calcul image moyenne
+    #---- Calcul image moyenne
     ---------------------------------------------------------------------------
     """
     
@@ -355,6 +355,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
     iw= int(hdr['NAXIS1'])                    # Largeur de l'image
     myimg=np.reshape(myimg, (ih, iw))   # Forme tableau X,Y de l'image moyenne
     
+        
     # sauve en fits l'image moyenne avec suffixe _mean
     savefich="Complements"+os.path.sep+basefich+'_mean'              
     SaveHdu=fits.PrimaryHDU(myimg,header=hdr)
@@ -375,12 +376,17 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         #print("Trame apparition : "+ str(tram1))
         #print("Trame disparition : "+ str(tram2))
         #print("Trame milieu : "+ str(tram1+(tram2-tram1)//2))
-        if flag_corona :
-            print("Trame sel : "+ str(deb1)+' '+str(deb2))
+        
         
         with open(serfile, "rb") as f:
             frame1 = tram1+deb1
             frame2 = tram1+deb2
+            
+            if flag_corona :
+
+                print("Selection : "+ str(frame1+deb1)+" , "+str(frame2+deb2))
+
+            
             n_to_read = frame2 - frame1
             count = n_to_read * frame_size
 
@@ -448,15 +454,16 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
   
     """
     ----------------------------------------------------------------------------
-    Calcul polynome ecart sur l'image moyenne
+    #---- Calcul polynome ecart sur l'image moyenne
     ----------------------------------------------------------------------------
     """
     # detect up and down limit of the spectrum of the mean image
     y1,y2=detect_bord(myimg, axis=1, offset=5, flag_disk=False)
     
-    if flag_corona :
-        y1= 100
-        y2=ih-100
+    #if flag_corona :
+       #y1= 100
+       #y2=ih-100
+        
     
     # calcul profile spectral en bonus
     pro = bin_to_spectre(myimg,y1,y2)
@@ -660,7 +667,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         imgplot1 = plt.imshow(myimg)
         plt.scatter(xdec,y,s=0.1, marker='.', edgecolors=('red'))
         plt.show()
-        plt.scatter(vals,np.arange(ih),s=0.1, marker='.', edgecolors=('green'))
+        #plt.scatter(vals,np.arange(ih),s=0.1, marker='.', edgecolors=('green'))
         
         #plt.scatter(MinX[mask],IndY[mask],s=0.1, marker='.', edgecolors=('blue'))
         plt.scatter(MinX,IndY,s=0.1, marker='.', edgecolors=('blue'))
@@ -716,7 +723,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
     """
     ----------------------------------------------------------------------------
     ----------------------------------------------------------------------------
-    Applique les ecarts a toute les lignes de chaque trame de la sequence
+    #---- Applique les ecarts a toute les lignes de chaque trame de la sequence
     ----------------------------------------------------------------------------
     ----------------------------------------------------------------------------
     """
@@ -917,6 +924,11 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         else :
             logme("Noise reduction option")
 
+    # !!!! special serbannes fente photometrique
+    # !!! special crop pour serbannes fente photometrique
+    #hdr['NAXIS2']=hdr['NAXIS2'] -200
+    #ih= int(hdr['NAXIS2'])                    
+    #Disk[i] = Disk[i][0:ih,:]
     
     # Sauve fichier disque reconstruit pour affichage image raw en check final
     hdr['NAXIS1']=FrameCount-1
@@ -928,6 +940,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
             #dp_str='_dp_'+str.replace(dp_str,".","_")
             dp_str="_dp"+str.replace(dp_str,".","_")
             img_suff.append(dp_str)
+            DiskHDU.writeto("Complements"+os.path.sep+basefich+img_suff[i]+'_raw.fits',overwrite='True')
         else:
             # le suffixe dp si shift non nul a deja été ajouté dans baseline
             img_suff.append('')
@@ -985,7 +998,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         if flag_noline == False :
             """
             --------------------------------------------------------------------
-            Calcul des mauvaises lignes et de la correction geometrique
+            #---- Calcul des mauvaises lignes et de la correction geometrique
             --------------------------------------------------------------------
             """       
         
@@ -1186,7 +1199,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         
         """
         --------------------------------------------------------------
-        Correction de non uniformity - basse freq
+        #---- Correction de non uniformity - basse freq
         --------------------------------------------------------------
         """
         # en cours d'experimentation... non utilisé
@@ -1219,7 +1232,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
             f_mask=flat*np.logical_not(chull)
             flat[f_mask==0]=1                
             
-            debug = True
+            debug = False
             if debug:
                 plt.imshow(flat)
                 plt.show()
@@ -1402,7 +1415,8 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
        
         """
         -----------------------------------------------------------------------
-        Calcul du tilt si on voit les bords du soleil
+        #---- Calcul du tilt 
+        Si on voit les bords du soleil
         sinon on n'applique pas de correction de tilt,
         on applique un facteur SY/SX=0.5
         et on renvoit a ISIS
@@ -1432,36 +1446,6 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
             # trouve les coordonnées y des bords du disque dont on a les x1 et x2 
             # pour avoir les coordonnées y du grand axe horizontal
             # on cherche la projection de la taille max du soleil en Y et en X
-
-            
-            
-            # Taille de l'image
-            #ih, iw = img2.shape
-            
-            # Pré-calcul du percentile bas si nécessaire
-            if y1 <= 15 or y2 > ih - 15:
-                perc15 = np.percentile(img2, 15)
-            
-            # Partie haute
-            if y1 <= 15:
-                img_dark1 = np.full((2, iw), perc15)
-            else:
-                img_dark1 = img2[0:10, :]
-            
-            # Partie basse
-            if y2 > ih - 15:
-                img_dark2 = np.full((2, iw), perc15)
-            else:
-                img_dark2 = img2[-10:, :]
-            
-            # Calculs des moyennes de remplissage (1D)
-            #img_fill1 = img_dark1.mean(axis=0)
-            #img_fill2 = img_dark2.mean(axis=0)
-            
-            # Fond basé sur l'ensemble des zones sombres
-            # Astuce : np.vstack évite un appel à np.concatenate avec tuple
-            img_dark = np.vstack((img_dark1, img_dark2))
-            background = np.percentile(img_dark, 55)
 
            
             # methode calcul angle de tilt avec XE ellipse fit
@@ -1506,8 +1490,38 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
 
     
             #decale lignes images par rapport au centre
-            colref=round(((el_x1+el_x2)/2)+el_x1)
+            colref=round(((el_x2-el_x1)/2)+el_x1) # bug 27 mai 2026 mauvais calcul du centre
             dymax=int(abs(TanAlpha)*(colref))
+            
+            # calcul du background
+            # Taille de l'image
+            #ih, iw = img2.shape
+            
+            # Pré-calcul du percentile bas si nécessaire
+            if y1 <= 15 or y2 > ih - 15:
+                perc15 = np.percentile(img2, 15)
+            
+            # Partie haute
+            if y1 <= 15:
+                img_dark1 = np.full((2, iw), perc15)
+            else:
+                img_dark1 = img2[0:10, :] 
+            
+            # Partie basse
+            if y2 > ih - 15:
+                img_dark2 = np.full((2, iw), perc15)
+            else:
+                img_dark2 = img2[-10:, :] 
+            
+            # Calculs des moyennes de remplissage (1D)
+            #img_fill1 = img_dark1.mean(axis=0)
+            #img_fill2 = img_dark2.mean(axis=0)
+            
+            # Fond basé sur l'ensemble des zones sombres
+            # Astuce : np.vstack évite un appel à np.concatenate avec tuple
+            img_dark = np.vstack((img_dark1, img_dark2))
+            background = np.percentile(img_dark, 55) 
+            
               
             # Ajout de padding en haut et en bas
             img2 = np.pad(img2, ((dymax, dymax), (0, 0)), mode='constant', constant_values=background)
@@ -1530,6 +1544,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
             NewImg[NewImg <= 0] = 0
         
             img2=np.copy(NewImg)
+            
 
                    
         debug_tilt=False
@@ -1547,7 +1562,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         
         """
         ----------------------------------------------------------------
-        Calcul du parametre de scaling SY/SX
+        #--- Calcul du parametre de scaling SY/SX
         ----------------------------------------------------------------
         """
         
@@ -1574,6 +1589,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
                 logme('Scaling SY/SX : '+"{:+.4f}".format(ratio))
             
             NewImg, newiw = circularise2_opt(img2,iw,ih,ratio)
+          
         
         else:
             # Forcer le ratio SY/SX
@@ -1596,11 +1612,18 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         frame=np.array(NewImg, dtype='uint16')
         #print('shape',frame.shape)
         
+        debug_SYSX=False
+        
+        if debug_SYSX==True:
+            # sauvegarde en fits de l'image tilt
+            img2=np.array(NewImg, dtype='uint16')
+            DiskHDU=fits.PrimaryHDU(NewImg,header=hdr)
+            DiskHDU.writeto(basefich+img_suff[k]+'_sysx.fits', overwrite='True')        
        
        
         """
         ----------------------------------------------------------------------
-        Sanity check, second iteration et calcul des parametres du disk occulteur
+        #---- Sanity check, second iteration et calcul des parametres du disk occulteur
         ----------------------------------------------------------------------
         """
         if flag_nobords:
@@ -1652,8 +1675,6 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
             geom.append(ratio_fixe_d1)
             geom.append(ang_tilt)
             
-
-            
         x0=cercle0[0]
         y0=cercle0[1]
         wi=round(cercle0[2])
@@ -1690,7 +1711,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
           
         """
         -----------------------------------------------------------------------
-        Correction rotation angle P et tilt
+        #---- Correction rotation angle P et tilt
         -----------------------------------------------------------------------
         """
         # corrige angle P de rotation si non nul
@@ -1869,7 +1890,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         if debug_time : tim.write('autocrop : '+"{:.2f}".format(dt)+'\n')
         
         #-----------------------------------------------------------------
-        # sauve images _recon, profil, log
+        #---- sauve images _recon, profil, log
         
         # detecte si image unique avec shift pour ajouter _cont au nom
         if len(range_dec)==1 and shift !=0 :

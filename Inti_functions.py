@@ -224,11 +224,18 @@ def detect_bord (img, axis, offset, flag_disk):
 
         #y1=yth.argmax()-offset
         #y2=yth.argmin()+offset
-        
-        # test si accroche sur ligne, ne detecte pas si disk < 2 * min_sep
-        # avec min_sep ecart entre bords de la ligne
-        i_max = np.argmax(yth)
-        i_min = np.argmin(yth)
+        #if offset != 0 and offset > 20 :
+        if offset != 0 : 
+            yp = yth[abs(offset):-abs(offset)]
+            i_max = np.argmax(yp)+abs(offset)
+            i_min = np.argmin(yp)+abs(offset)
+            offset = 0
+            
+        else :
+            # test si accroche sur ligne, ne detecte pas si disk < 2 * min_sep
+            # avec min_sep ecart entre bords de la ligne
+            i_max = np.argmax(yth)
+            i_min = np.argmin(yth)
         min_sep = 40
     
         if abs(i_min - i_max) < min_sep:
@@ -296,7 +303,7 @@ def detect_bord (img, axis, offset, flag_disk):
             plt.plot(xth)
             plt.title('Gradient Profil X - filtre gaussien ')
             plt.show()
-            print("Position X des limbes x1, x2 :",a1,a2)
+            print("Position X des limbes x1, x2 :"+ str(a1)+','+ str(a2))
         
     return (a1,a2)
 
@@ -474,13 +481,15 @@ def detect_noXlimbs (myimg):
 
 
 def detect_edge (myimg,zexcl, crop, disp_log):
+    # modif avril 2026, filtrage polynomial don elimine critere sur gradient > seuil
+    # modif avril 2026, s[1]-s[0]> (x2-x1)//4 au lieu de (x2-x2)//2
     edgeX = []
     edgeY = []
     bord_droit = []
     bord_gauche = []
     bord_droitY = []
     bord_gaucheY = []
-    zexcl = 0.01 # rendu obsolete
+    zexcl = 0.01 # non utilisé car s[1]-s[0]> (x2-x1)//4 comme critère 
     #ih = myimg.shape[0]  not used
     iw = myimg.shape[1]
     
@@ -488,27 +497,26 @@ def detect_edge (myimg,zexcl, crop, disp_log):
     
     debug=False # les images
     debug1=False #les courbes
-    if debug : print("crop...", crop)
+    if debug : print("crop... "+str( crop))
     
     if debug:
         plt.imshow(myimg)
         plt.show()
         
     # au cas ou il fallait faire differament avec fort tilt
-    if crop!=0:
-        myimg_crop=myimg
-        #myimg_crop=myimg[crop:-crop,:]
-
-    else:
-        myimg_crop=myimg
+    myimg_crop=myimg
         
     #detect bord
-    y1,y2=detect_bord (myimg_crop, axis=1,offset=0, flag_disk=True)    # bords verticaux
+    y1,y2=detect_bord (myimg_crop, axis=1,offset=abs(crop), flag_disk=True)    # modif 27 mai 2026 7.0.4
+    #y1,y2=detect_bord (myimg_crop, axis=1,offset=0, flag_disk=True)    # bords verticaux
     x1,x2= detect_bord(myimg_crop,axis=0, offset=0, flag_disk=True)
-    if debug : print("edge y1,y2 : ", y1, y2)
+    if debug : 
+        print("edge y1,y2 : "+str(y1)+","+str( y2))
+        print("edge x1,x2 : "+str(x1)+","+str( x2))
+        #print("ratio : "+str( abs(y2-y1)/abs(x2-x1)))
     milieu=int(x1+(x2-x1)/2)
     rayon=int((x2-x1)/2)
-    if debug : print("rayon : "+ str(rayon))
+    if debug : print("rayon hor : "+ str(rayon))
     
     if abs(crop) >=100 : # fort tilt
         # si crop <0 alors pente de droite à gauche (gauche plus bas)
@@ -517,18 +525,19 @@ def detect_edge (myimg,zexcl, crop, disp_log):
         zexcl=0
         zone_bin_agauche=max(0,milieu-rayon-50)
         sub_img1=myimg_crop[:,zone_bin_agauche:milieu]
-        #sub_img2=myimg_crop[:,milieu:-5]
-        #zone_bin_adroite=min(2*milieu+50,iw)
         zone_bin_adroite=min(milieu+rayon+50,iw)
         sub_img2=myimg_crop[:,milieu:zone_bin_adroite]
-        # bords vertical gauche et droit
-        y1g,y2g=detect_bord (sub_img1, axis=1,offset=0,flag_disk=True)
-        y1d,y2d=detect_bord (sub_img2, axis=1,offset=0,flag_disk=True)
+        # bords verticaux gauche et droit
+        y1g,y2g=detect_bord (sub_img1, axis=1,offset=abs(crop),flag_disk=True) #modif 17 mai 2026 
+        y1d,y2d=detect_bord (sub_img2, axis=1,offset=abs(crop),flag_disk=True)
+        #y1g,y2g=detect_bord (sub_img1, axis=1,offset=0,flag_disk=True)
+        #y1d,y2d=detect_bord (sub_img2, axis=1,offset=0,flag_disk=True)
+        
         #y1=min(y1g,y1d)-dy
         #y2=max(y2g,y2d)+dy
         y1=max(y1g,y1d)+dy # modif du 17 mai 2025 profil Aguerre 8 bits
         y2=min(y2g,y2d)-dy
-        if debug : print('y1,y2 crop', y1,y2, dy)
+        if debug : print('y1,y2 crop'+str(y1)+","+str( y2)+" "+str(dy))
         
         
 
@@ -568,7 +577,10 @@ def detect_edge (myimg,zexcl, crop, disp_log):
         if kernel % 2 == 0 :
             # valeur paire
             kernel= kernel + 1
-            
+    #offset=kernel//2 # modif avril 2026
+    offset=0
+    #print("kernel : "+str(kernel))
+    
     li_c= np.copy(img_c[:,:-5])
     li_c_disk=np.copy(img_c[:,xg:xd])
 
@@ -576,7 +588,7 @@ def detect_edge (myimg,zexcl, crop, disp_log):
         #li=np.copy(img_c[i,:-5]) # acceleration calcul modif du 18 mai 2025
         li= li_c[i,:]
         #method detect_bord same as flat median
-        offset=0
+        
         # calcul sur box autour de disk
         li_disk= li_c_disk[i,:]
         b=np.percentile(li_disk,97)
@@ -606,7 +618,7 @@ def detect_edge (myimg,zexcl, crop, disp_log):
         x2li=li_gr.argmin()
 
         
-        if 2==1 :
+        if 1==1 :
             if i in range(1795, 1800) :
             #if i in range(y1+ze1+3, y1+ze1+5) :
             #if x1 <2500 :
@@ -631,7 +643,8 @@ def detect_edge (myimg,zexcl, crop, disp_log):
         else:
             s=np.array([x1li,x2li])
             
-            if s.size !=0 and (s[-1]-s[0])> (x2-x1)/2:
+            #if s.size !=0 and (s[-1]-s[0])> (x2-x1)/2: modif avril 2026
+            if s.size !=0 and (s[-1]-s[0])> (x2-x1)/4:
                 c_x1=s[0]+offset
                 c_x2=s[-1]-offset
                 bord_gauche.append(c_x1)
@@ -659,59 +672,40 @@ def detect_edge (myimg,zexcl, crop, disp_log):
     
     # elimine les points le long des bords haut et bas si disk pas entier
     # si on divise par continuum on n'exclue pas les bords de crop
-    # si on filtre trop on elimine des points sur un disue entier
+    # si on filtre trop on elimine des points sur un disque entier
     for i in range(0,2) :
         exd=np.copy(bords[i]) # bord gauche i=0, bord droit i=1
-        #eY=np.copy(bordsY[i])
         gr_ex=abs(np.gradient(exd))
-        
-        #smooth=gaussian_filter1d(gr_ex, 21)
-        #d=gr_ex-smooth
 
         g=[x for x in gr_ex if x > 0]
-        #g=[x for x in d if (x > 0 and x <5) ]
-        th=np.mean(g)
-        
-        if debug1 :
-            print("grmean ", np.mean(g))
-            plt.title ('grmean '+str(th)+' '+str(i))
-            plt.plot(gr_ex)
-            plt.show()
-            #plt.plot(d)
-            #plt.title('gardient sans continuum')
-            plt.show()
+        #th=np.mean(g)       #modif avril 2026
     
         # filtrage
         kk=1
         for k in range(0,len(gr_ex)-1) :   
-            #if abs ((bords[i][kk]-bords[i][kk-1])/(bordsY[i][kk]-bordsY[i][kk-1])) > th :
             # ajoute filtrage ou un point bord droit est inférieur au mileu (cas protus)
-            if abs(gr_ex[k]) > th or bords[i][kk]<=abs(x1-100) or bords[i][kk]>=x2+100 or bords[i][kk] - (i*milieu) <=0 :
-            #if abs(d[k]) > th :
-                #print("kk ",kk)
+            if bords[i][kk]<=abs(x1-100) or bords[i][kk]>=x2+100 or bords[i][kk] - (i*milieu) <=0 : # avril 2026 ne rejet que fort ecart
+            #if abs(gr_ex[k]) > th or bords[i][kk]<=abs(x1-100) or bords[i][kk]>=x2+100 or bords[i][kk] - (i*milieu) <=0 :
                 del bords[i][kk]
                 del bordsY[i][kk]
                 kk=kk-1
-            kk=kk+1
-            
+            kk=kk+1          
         
     if debug :
         plt.imshow(myimg)
         # plot edges on image as red dots
         a=bords[0]+bords[1]
         b=bordsY[0]+bordsY[1]
-        plt.title('filtre gradient ')
-        plt.scatter(a,b,s=0.1, marker='.', edgecolors=('red'))
+        plt.title('filtre outliers ')
+        #plt.scatter(a,b,s=0.1, marker='.', edgecolors=('red'))
+        plt.plot(a, b, ',', color='red')
         plt.show()
         
     for s in range (0,2) :
-        # divise profil des bords par son filtre gaussien et elimine les points 
-        # au dessus de 3 pixels
+        # divise profil des bords par un polyfit et elimine les points 
+        # au dessus de clip = 5 pixels
         for i in range(0,2) :
-    
-            #s = gaussian_filter1d(bords[i], 11)
-            #sav = savgol_filter(bords[i], 301, 2)
-            
+               
             # Test entre 5 et 6 
             p = np.polyfit(bordsY[i][1:-1],bords[i][1:-1],6)
             #p = np.polyfit(bordsY[i][1:-1],bords[i][1:-1],5)
@@ -725,17 +719,12 @@ def detect_edge (myimg,zexcl, crop, disp_log):
             #f = bords[i]-s
             #fsav = bords[i]-sav
     
-            clip=3
+            clip=5
         
             if debug1 :
-                plt.scatter(bordsY[i], bords[i], s=0.1,marker='.')
-                #plt.show()
-                #plt.plot(s)
-                #plt.plot(sav)
-                plt.scatter(bordsY[i],np.array(fit), s=0.1,marker='.')
+                plt.plot(bordsY[i], bords[i], ',',color='red')
+                plt.plot(bordsY[i],np.array(fit), ',',color='blue')
                 plt.show()
-                #plt.plot(f)
-                #plt.plot(fsav)
                 plt.title ("diff "+str(i))
                 plt.plot(fp)
                 plt.hlines(clip, 0, len(bords[i]), color="red")
@@ -771,7 +760,7 @@ def detect_edge (myimg,zexcl, crop, disp_log):
                         #bords[i][kk]=fit[k]
                     kk=kk+1
     
-    # avant fit polynomial
+    # avant nouveau fit polynomial
    
     if debug :
         plt.imshow(myimg)
@@ -780,24 +769,28 @@ def detect_edge (myimg,zexcl, crop, disp_log):
         a2=bords[1]
         b2=bordsY[1]
         plt.title("bord 0 red - bord 1 yellow - avant poly")
-        plt.scatter(a1,b1,s=0.1, marker='.', edgecolors=('red'))
-        plt.scatter(a2,b2,s=0.1, marker='.', edgecolors=('yellow'))
+        plt.plot(a1,b1, ',', color='red')
+        plt.plot(a2,b2, ',', color='yellow')
         plt.show()
     
 
     #if  not cfg.LowDyn : # echec du fit polynomial en faible dynamique
-    if  1==1 : # ne fait pas le fit poly 
+    if  1==1 : # peut ne pas faire le dernier fit poly 
     # guillaume
         polyB=[]
         polyY=[]
         pB=[]
-        pY=[]               
+        pY=[]
+        bxs=[] # ajout avril 2026
+        bys=[] # ajout avril 2026               
         for i in range(0,2)  :
             # Test entre 5 et 6 
             p = np.polyfit(bordsY[i][1:-1],bords[i][1:-1],6)
             #p = np.polyfit(bordsY[i][1:-1],bords[i][1:-1],5)
     
             for y in range(bordsY[i][5],bordsY[i][-5]) :
+            # test pour better scaling X/Y avril 2026
+            #for y in range (y1+(10*ze), y2-(10*ze)) :
                 fitv = p[0]*y**6+p[1]*y**5+p[2]*y**4+p[3]*y**3+p[4]*y**2+p[5]*y+p[6]
                 #fitv = p[0]*y**5+p[1]*y**4+p[2]*y**3+p[3]*y**2+p[4]*y**1+p[5]
                 if fitv>=0 :
@@ -806,12 +799,22 @@ def detect_edge (myimg,zexcl, crop, disp_log):
             #print('Coef poly ',p)
             polyB.append(pB)
             polyY.append(pY)
-            bords[i]=polyB[i]
-            bordsY[i]=polyY[i]
+            #bords[i]=polyB[i] removed avril 2026
+            #bordsY[i]=polyY[i] removed avril 2026
+            bxs.append(polyB[i])
+            bys.append(polyY[i])
+            
+            if debug1 :
+                plt.plot(bordsY[i], bords[i], ',',color='red')
+                plt.plot(bys[i],bxs[i], ',',color='blue')
+                plt.show()
     
     # recombine bords droit et gauche
-    edgeX=bords[0]+bords[1]
-    edgeY=bordsY[0]+bordsY[1]
+    # modif avril 2026
+    #edgeX=bords[0]+bords[1]
+    #edgeY=bordsY[0]+bordsY[1]
+    edgeX=bxs[0]+bxs[1]
+    edgeY=bys[0]+bys[1]
 
     
     X = np.array(list(zip(edgeX, edgeY)), dtype='float')  
@@ -823,7 +826,8 @@ def detect_edge (myimg,zexcl, crop, disp_log):
         np_m=np.asarray(X)
         xm,ym=np_m.T
         plt.title('filtre gradient et outliers continuum et fit polynomial')
-        plt.scatter(xm,ym,s=0.1, marker='.', edgecolors=('red'))
+        #plt.scatter(xm,ym,s=0.1, marker='.', edgecolors=('red'))
+        plt.plot(xm,ym, ",", color="red")
         plt.show()
 
     return X
@@ -852,7 +856,6 @@ def fit_ellipse (myimg,X,disp_log):
     center, width, height, phi = reg.as_parameters()
     EllipseFit=[center,width,height,phi]
     #EllipseFit=[center,height,width,phi]
-    #section=((baryY-center[1])/center[1])
     XE=reg.return_fit(n_points=2000)
     
     
@@ -869,7 +872,8 @@ def fit_ellipse (myimg,X,disp_log):
         # plot edges on image as red dots
         np_m=np.asarray(X)
         xm,ym=np_m.T
-        plt.scatter(xm,ym,s=0.1, marker='.', edgecolors=('red'))
+        #plt.scatter(xm,ym,s=0.01, marker='.', edgecolors=(None))
+        plt.plot(xm, ym, ',', color='yellow')
         # plot ellipse in blue
         try:
             ellipse = Ellipse(
@@ -885,11 +889,91 @@ def fit_ellipse (myimg,X,disp_log):
             pass
        
         plt.show()
+        
+        plt.imshow(myimg)
+        plt.show()
 
 
     return EllipseFit, XE
 
+def fit_ellipse2 (myimg, X, disp_log=False):
+    from skimage.measure import EllipseModel
+    from matplotlib.patches import Ellipse
 
+    debug_graphics = False
+
+    ellipse = EllipseModel()
+
+    ok = ellipse.estimate(X)
+
+    if not ok:
+        raise RuntimeError("Ellipse fit failed")
+
+    xc, yc, a, b, theta = ellipse.params
+
+    center = (xc, yc)
+
+    # compatibilité avec ton ancien format
+    
+    if b > a *1.01:
+        a, b = b, a
+        theta += np.pi / 2
+    
+    # normalisation angle (ellipse = période π)
+    theta = np.mod(theta, np.pi)
+    EllipseFit = [center, a, b, theta]
+
+    # génération ellipse affichage
+    t = np.linspace(0, 2*np.pi, 2000)
+
+    ct = np.cos(theta)
+    st = np.sin(theta)
+
+    x = a * np.cos(t)
+    y = b * np.sin(t)
+
+    XE_x = xc + x * ct - y * st
+    XE_y = yc + x * st + y * ct
+
+    XE = np.column_stack((XE_x, XE_y))
+
+    if disp_log:
+        print("Paramètres ellipse ............")
+        print(f'center: {xc:.3f}, {yc:.3f}')
+        print(f'width: {a:.3f}')
+        print(f'height: {b:.3f}')
+        print(f'phi_rad: {theta:.6f}')
+        print(f'phi_deg: {np.rad2deg(theta):.6f}')
+
+    if debug_graphics:
+
+        plt.imshow(myimg, cmap='gray')
+
+        xm, ym = X.T
+
+        plt.plot(xm, ym, ',', color='yellow')
+
+        try:
+
+            ell_patch = Ellipse(
+                xy=center,
+                width=2*a,
+                height=2*b,
+                angle=np.rad2deg(theta),
+                edgecolor='cyan',
+                fc='None',
+                lw=1
+            )
+
+            ax = plt.gca()
+            ax.add_patch(ell_patch)
+
+        except Exception as e:
+            print(e)
+
+        plt.show()
+
+    return EllipseFit, XE
 
 
 #==============================================================================

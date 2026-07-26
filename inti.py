@@ -56,9 +56,16 @@ import time # only for measure
 import requests
 import matplotlib.pyplot as plt #only for debug
 
+# TODO : Angle P sur hélium
+
 
 
 """
+version 7.0.4 WIP
+- ajout detect_edge gestion crop dans detect_bord pour gerer fort tilt et diffusé
+- si erreur detection inversions sur gong, affiche image gong original
+- bug mode couronne y&,y2 etait en dur
+
 Version 7.0.3
 - bug fix sur nom fichier dp, cont avec decalage decimal
 - affiche console valeur de la longueur d'onde selectionnée BASS2000
@@ -170,6 +177,7 @@ Version 6.5c - 16 avril 2025
 # TODO : memoriser les positions des fenetres images si double écran
 
 
+
 original_stdout = sys.stdout
 
 class main_wnd_UI(QMainWindow) :
@@ -179,7 +187,7 @@ class main_wnd_UI(QMainWindow) :
         #super().__init__(parent)
         super(main_wnd_UI, self).__init__()
 
-        self.version ="7.0.3"
+        self.version ="7.0.3a"
         #iv = ImageView # force le load d'ImageView avant QUILoader
         # ne change rien...
         
@@ -1587,26 +1595,46 @@ class main_wnd_UI(QMainWindow) :
                 flag_erreur_weak=False
                 
                 try :
-                    fr1=np.copy(frames[1])
-                    fr2=np.copy(frames[2])
-                    fr0=np.copy(frames[0])
-                    s=np.array(np.array(fr1, dtype='float64')+np.array(fr2, dtype='float64'),dtype='float64')
-                    moy=s*0.5
-                    img_diff=np.array(fr2, dtype='float64')-np.array(fr1, dtype='float64')
+                    fr0 = frames[0].astype(np.float64)
+                    fr1 = frames[1].astype(np.float64)
+                    fr2 = frames[2].astype(np.float64)
                     
-                    d=(np.array(fr0, dtype='float64')-moy)
+                    moy = (fr1 + fr2) * 0.5
+                    img_diff = fr2 - fr1
                     
-                    offset=-np.min(d)
-                    if offset > 0 :
-                        offset=offset+100
-                        if self.Flags['Couronne'] and offset > 1000 :
-                            offset=1000
+                    d = fr0 - moy
+                    
+                    offset = max(0.0, -d.min())
+                    print("offset: "+str(offset))
+
+                    if offset > 0:
+                        offset += 100
+                        if self.Flags['Couronne']:
+                            offset = min(offset, 1000)
+                            #offset = 0
                     else :
                         offset=0
-                    
+                   
                     #print("Offset "+str(offset))
-                    img_weak_array=d+float(offset)
-                    img_weak_uint=np.array((img_weak_array), dtype='uint16')
+                    img_weak_array = np.clip(d + offset, 0, 65535)
+                    img_weak_uint = img_weak_array.astype(np.uint16)
+                    
+                    if self.Flags['Couronne'] and 2==1:
+                        #disk_limit_percent=0.0015 # black disk radius inferior by 3.5% to disk edge (was 2%) -june25
+                        disk_limit_percent=0.003
+                        if cercle[0]!=0:
+                            x0=cercle[0]
+                            y0=cercle[1]
+                            #wi=round(cercle[2])
+                            #he=round(cercle[3])
+                            wi=int(cercle[2])
+                            he=int(cercle[3])
+                            r=(min(wi,he))
+                            #r=int(r- round(r*disk_limit_percent))-1 # retrait de 1 pixel modif de juin 2023
+                            r=int(r- round(r*disk_limit_percent))
+                            
+                            flou=r*disk_limit_percent
+                            img_weak_uint=disk_gauss (img_weak_uint, x0, y0, int(r-(2*flou)), flou).astype(np.uint16)
                     
                     #Seuil_bas=int(offset//2)
                     Seuil_bas=0
@@ -1725,12 +1753,15 @@ class main_wnd_UI(QMainWindow) :
         
         # image contraste inversé
         # ------------------------
-        frame_sub=65535-frame_contrasted
+        #frame_sub=65535-frame_contrasted
+        frame = frame_contrasted - frame_contrasted.min()
+        frame_sub = frame.max() - frame        
         if self.files_to_save['inv'] : cv2.imwrite(self.basefich+img_suffix+'_inv.png',frame_sub)
-        # test mix mais c'est moche...
+        
+        # test mix mais c'est moche...        
         frame_sub[frame_sub==65535]=1000
         frame_combo=np.maximum(frame_contrasted3, frame_contrasted)
-        frame_combo[frame_combo==65535]=0
+        frame_combo[frame_combo==65535]=0        
         if self.files_to_save['mix'] : cv2.imwrite(self.basefich+img_suffix+'_mix.png',frame_combo)
         
         
@@ -2346,6 +2377,7 @@ class main_wnd_UI(QMainWindow) :
             nparr =np.frombuffer(img_data,np.uint8)
             img_gong=cv2.imdecode(nparr,cv2.IMREAD_GRAYSCALE)
             hg,wg=img_gong.shape
+            img_gong_orig=np.copy(img_gong)
             
             if os.path.exists(filename):
                 #web.open(filename)
@@ -2408,7 +2440,15 @@ class main_wnd_UI(QMainWindow) :
                 self.mygong.update_inversions(inversion)
                 self.mygong.ui.finished.connect(self.ori_get_inversions)
             except:
-                print('Erreur détection inversions')    
+                print('Erreur détection inversions')
+                print('Affiche gong original')
+                # affiche iamge gong
+                pixmap = QtGui.QPixmap()
+                #pixmap.loadFromData(img_gong)
+                img_gong = np.ascontiguousarray(img_gong_orig)
+                myqgong = QtGui.QImage(img_gong, gw, gh, img_gong.strides[0],QtGui.QImage.Format_Grayscale8 )
+                pixmap= QtGui.QPixmap.fromImage(myqgong)
+
                 
             # on affiche la fenetre
             self.mygong.show()
