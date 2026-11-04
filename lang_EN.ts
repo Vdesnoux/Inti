@@ -295,8 +295,8 @@
         <location filename="inti_qt.ui" line="1116"/>
         <location filename="inti_qt.ui" line="1193"/>
         <location filename="inti_qt.ui" line="1590"/>
-        <location filename="inti_qt.ui" line="1812"/>
         <location filename="inti_qt.ui" line="1838"/>
+        <location filename="inti_qt.ui" line="1864"/>
         <source>0</source>
         <translation></translation>
     </message>
@@ -330,6 +330,7 @@
         <location filename="inti_qt.ui" line="741"/>
         <location filename="inti_qt.ui" line="1327"/>
         <location filename="inti_qt.ui" line="1347"/>
+        <location filename="inti_qt.ui" line="1724"/>
         <source>3</source>
         <translation></translation>
     </message>
@@ -643,128 +644,138 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1719"/>
+        <location filename="inti_qt.ui" line="1729"/>
+        <source>5</source>
+        <translation>5</translation>
+    </message>
+    <message>
+        <location filename="inti_qt.ui" line="1745"/>
         <source>Observateur :</source>
         <translation>Observer :</translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1742"/>
+        <location filename="inti_qt.ui" line="1768"/>
         <source>SOLEX_</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1755"/>
+        <location filename="inti_qt.ui" line="1781"/>
         <source>Instrument :</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1778"/>
+        <location filename="inti_qt.ui" line="1804"/>
         <source>Longueur d&apos;onde :</source>
         <translation>Wavelength :</translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1797"/>
+        <location filename="inti_qt.ui" line="1823"/>
         <source>Site : </source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1825"/>
+        <location filename="inti_qt.ui" line="1851"/>
         <source>Longitude</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1851"/>
+        <location filename="inti_qt.ui" line="1877"/>
         <source>Latitude </source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1864"/>
+        <location filename="inti_qt.ui" line="1890"/>
         <source>E positif</source>
         <translation>E positive</translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1877"/>
+        <location filename="inti_qt.ui" line="1903"/>
         <source>N positif</source>
         <translation>N positive</translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1891"/>
+        <location filename="inti_qt.ui" line="1917"/>
         <source>Binning :</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1905"/>
+        <location filename="inti_qt.ui" line="1931"/>
         <source>1x1</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1910"/>
+        <location filename="inti_qt.ui" line="1936"/>
         <source>2x2</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1915"/>
+        <location filename="inti_qt.ui" line="1941"/>
         <source>3x3</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1920"/>
+        <location filename="inti_qt.ui" line="1946"/>
         <source>4x4</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1934"/>
+        <location filename="inti_qt.ui" line="1960"/>
         <source>Editer Entête complète</source>
         <translation>Edit full header</translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1959"/>
+        <location filename="inti_qt.ui" line="1985"/>
         <source>Gong</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1972"/>
+        <location filename="inti_qt.ui" line="1998"/>
         <source>Inversion E-W</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1985"/>
+        <location filename="inti_qt.ui" line="2011"/>
         <source>Inversion N-S</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="1998"/>
+        <location filename="inti_qt.ui" line="2024"/>
         <source>Angle P</source>
         <translation>P angle</translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="2021"/>
+        <location filename="inti_qt.ui" line="2047"/>
         <source>Nord en haut, Est à gauche, 
 P positif vers l&apos;est</source>
         <translation>North is Up, East on Left, 
 P positive toward East</translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="2041"/>
+        <location filename="inti_qt.ui" line="2067"/>
         <source>Date :</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="2054"/>
+        <location filename="inti_qt.ui" line="2080"/>
         <source>Angle P correction</source>
         <translation>P angle correction</translation>
+    </message>
+    <message>
+        <location filename="inti_qt.ui" line="2131"/>
+        <source>Enregistrer</source>
+        <translation>Save</translation>
     </message>
     <message>
         <source>Angle P auto</source>
         <translation type="vanished">P angle auto</translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="2080"/>
+        <location filename="inti_qt.ui" line="2106"/>
         <source>Console</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="inti_qt.ui" line="2096"/>
+        <location filename="inti_qt.ui" line="2124"/>
         <source>Effacer</source>
         <translation>Clear</translation>
     </message>
@@ -882,12 +893,12 @@ P positive toward East</translation>
 <context>
     <name>img_wnd</name>
     <message>
-        <location filename="inti.py" line="2670"/>
+        <location filename="inti.py" line="2870"/>
         <source>Sauver fichier png</source>
         <translation>Save png file</translation>
     </message>
     <message>
-        <location filename="inti.py" line="2670"/>
+        <location filename="inti.py" line="2870"/>
         <source>Fichiers png (*.png);;Tous les fichiers (*)</source>
         <translation>Files png (*.png);;All files (*)</translation>
     </message>
@@ -895,67 +906,73 @@ P positive toward East</translation>
 <context>
     <name>main_wnd_UI</name>
     <message>
-        <location filename="inti.py" line="422"/>
+        <location filename="inti.py" line="479"/>
         <source>Une nouvelle Version est disponible</source>
         <translation>A new version is available</translation>
     </message>
     <message>
-        <location filename="inti.py" line="947"/>
-        <location filename="inti.py" line="994"/>
-        <location filename="inti.py" line="2475"/>
-        <location filename="inti.py" line="2512"/>
+        <location filename="inti.py" line="1038"/>
+        <location filename="inti.py" line="1099"/>
+        <location filename="inti.py" line="2660"/>
+        <location filename="inti.py" line="2701"/>
         <source>Aucun fichier sélectionné</source>
         <translation>No file selected</translation>
     </message>
     <message>
-        <location filename="inti.py" line="997"/>
+        <location filename="inti.py" line="1102"/>
         <source>Fichiers png</source>
         <translation>Files png</translation>
     </message>
     <message>
-        <location filename="inti.py" line="1044"/>
-        <location filename="inti.py" line="1230"/>
-        <location filename="inti.py" line="2416"/>
+        <location filename="inti.py" line="1150"/>
+        <location filename="inti.py" line="1336"/>
+        <location filename="inti.py" line="2598"/>
         <source>Erreur de nom de fichier : </source>
         <translation>File name error : </translation>
     </message>
     <message>
-        <location filename="inti.py" line="1344"/>
+        <location filename="inti.py" line="1463"/>
         <source>Intensité moyenne : </source>
         <translation>Average intensity : </translation>
     </message>
     <message>
-        <location filename="inti.py" line="1503"/>
+        <location filename="inti.py" line="1623"/>
         <source>Erreur image doppler.</source>
         <translation>Error Doppler image.</translation>
     </message>
     <message>
-        <location filename="inti.py" line="1525"/>
+        <location filename="inti.py" line="1645"/>
         <source>Erreur image difference </source>
         <translation>Error image of differences </translation>
     </message>
     <message>
-        <location filename="inti.py" line="1611"/>
+        <location filename="inti.py" line="1762"/>
         <source>Erreur image </source>
         <translation>Image error </translation>
     </message>
     <message>
-        <location filename="inti.py" line="2118"/>
+        <location filename="inti.py" line="1748"/>
+        <location filename="inti.py" line="2287"/>
         <source>erreur format angle P</source>
         <translation>Error angle P format</translation>
     </message>
     <message>
-        <location filename="inti.py" line="863"/>
+        <location filename="inti.py" line="943"/>
         <source>Erreur à la sauvegarde de inti_ini.yaml : </source>
         <translation>Error saving inti_ini.yaml : </translation>
     </message>
     <message>
-        <location filename="inti.py" line="2471"/>
+        <location filename="inti.py" line="2656"/>
         <source>Fichier non trouvé : </source>
         <translation>File not found : </translation>
     </message>
     <message>
-        <location filename="inti.py" line="2501"/>
+        <location filename="inti.py" line="2667"/>
+        <source>Fichier console.txt</source>
+        <translation>File console.txt</translation>
+    </message>
+    <message>
+        <location filename="inti.py" line="2690"/>
         <source>Fichier profil : </source>
         <translation>Profile file : </translation>
     </message>
@@ -968,225 +985,225 @@ P positive toward East</translation>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="39"/>
+        <location filename="param.ui" line="40"/>
         <source>Observateur :</source>
         <translation>Observer :</translation>
     </message>
     <message>
-        <location filename="param.ui" line="56"/>
+        <location filename="param.ui" line="57"/>
         <source>Contact :</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="76"/>
+        <location filename="param.ui" line="77"/>
         <source>Site Longitude :</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="89"/>
-        <location filename="param.ui" line="116"/>
+        <location filename="param.ui" line="262"/>
+        <location filename="param.ui" line="281"/>
         <source>0</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="96"/>
+        <location filename="param.ui" line="570"/>
         <source>E positif</source>
         <translation>E positive</translation>
     </message>
     <message>
-        <location filename="param.ui" line="103"/>
+        <location filename="param.ui" line="84"/>
         <source>Site Latitude : </source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="123"/>
+        <location filename="param.ui" line="586"/>
         <source>N positif</source>
         <translation>N positive</translation>
     </message>
     <message>
-        <location filename="param.ui" line="130"/>
+        <location filename="param.ui" line="97"/>
         <source>Instrument :</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="143"/>
+        <location filename="param.ui" line="110"/>
         <source>SOLEX_</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="150"/>
+        <location filename="param.ui" line="123"/>
         <source>Longueur d&apos;onde :</source>
         <translation>Wavelength :</translation>
     </message>
     <message>
-        <location filename="param.ui" line="167"/>
+        <location filename="param.ui" line="130"/>
         <source>Caméra :    </source>
         <translation>Camera :    </translation>
     </message>
     <message>
-        <location filename="param.ui" line="184"/>
+        <location filename="param.ui" line="147"/>
         <source>Binning :</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="192"/>
+        <location filename="param.ui" line="311"/>
         <source>1x1</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="197"/>
+        <location filename="param.ui" line="316"/>
         <source>2x2</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="202"/>
+        <location filename="param.ui" line="321"/>
         <source>3x3</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="207"/>
+        <location filename="param.ui" line="326"/>
         <source>4x4</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="215"/>
+        <location filename="param.ui" line="154"/>
         <source>Taille pixel : </source>
         <translation>Pixel size : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="228"/>
+        <location filename="param.ui" line="346"/>
         <source>2.4</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="235"/>
-        <location filename="param.ui" line="511"/>
+        <location filename="param.ui" line="608"/>
+        <location filename="param.ui" line="736"/>
         <source>microns</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="242"/>
+        <location filename="param.ui" line="161"/>
         <source>Focale Instrument : </source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="262"/>
-        <location filename="param.ui" line="289"/>
-        <location filename="param.ui" line="316"/>
-        <location filename="param.ui" line="383"/>
-        <location filename="param.ui" line="410"/>
-        <location filename="param.ui" line="538"/>
+        <location filename="param.ui" line="624"/>
+        <location filename="param.ui" line="640"/>
+        <location filename="param.ui" line="656"/>
+        <location filename="param.ui" line="672"/>
+        <location filename="param.ui" line="688"/>
+        <location filename="param.ui" line="752"/>
         <source>mm</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="269"/>
+        <location filename="param.ui" line="168"/>
         <source>Diamètre Instrument : </source>
         <translation>Diameter Instrument : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="296"/>
+        <location filename="param.ui" line="391"/>
         <source>Diaphragme Instrument : </source>
         <translation>Diaphragm Intrument : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="323"/>
+        <location filename="param.ui" line="175"/>
         <source>Filtre réjection  : </source>
         <oldsource>Filtre densité : </oldsource>
         <translation>Energy rejection filter : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="343"/>
+        <location filename="param.ui" line="195"/>
         <source>Spectro :   </source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="356"/>
+        <location filename="param.ui" line="208"/>
         <source>SOLEX</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="363"/>
+        <location filename="param.ui" line="417"/>
         <source>Focale objectif Collimateur : </source>
         <translation>Focale lens Collimator : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="376"/>
+        <location filename="param.ui" line="436"/>
         <source>80</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="390"/>
+        <location filename="param.ui" line="443"/>
         <source>Focale objectif  caméra : </source>
         <translation>Focale lens camera : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="403"/>
+        <location filename="param.ui" line="462"/>
         <source>125</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="417"/>
+        <location filename="param.ui" line="215"/>
         <source>Réseau nb traits : </source>
         <translation>Grating nb lines : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="430"/>
+        <location filename="param.ui" line="481"/>
         <source>2400</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="437"/>
+        <location filename="param.ui" line="704"/>
         <source>tr/mm</source>
         <translation>lp/mm</translation>
     </message>
     <message>
-        <location filename="param.ui" line="444"/>
+        <location filename="param.ui" line="222"/>
         <source>Ordre du spectre : </source>
         <translation>Spectrum order : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="457"/>
+        <location filename="param.ui" line="500"/>
         <source>1</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="464"/>
+        <location filename="param.ui" line="229"/>
         <source>Angle Réseau : </source>
         <translation>Grating angle : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="477"/>
+        <location filename="param.ui" line="519"/>
         <source>34</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="484"/>
+        <location filename="param.ui" line="720"/>
         <source>°</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="491"/>
+        <location filename="param.ui" line="236"/>
         <source>Largeur fente : </source>
         <translation>Slit width : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="504"/>
+        <location filename="param.ui" line="538"/>
         <source>10</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="518"/>
+        <location filename="param.ui" line="243"/>
         <source>Longueur fente : </source>
         <translation>Slit height : </translation>
     </message>
     <message>
-        <location filename="param.ui" line="531"/>
+        <location filename="param.ui" line="557"/>
         <source>4.5</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="param.ui" line="568"/>
+        <location filename="param.ui" line="785"/>
         <source>Fermer</source>
         <translation>Close</translation>
     </message>

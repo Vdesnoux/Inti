@@ -50,131 +50,35 @@ from serfilesreader_vhd import Serfile
 from datetime import datetime, UTC
 import requests as rq
 import webbrowser as web
+from pathlib import Path
 
 import time # only for measure
 
 import requests
 import matplotlib.pyplot as plt #only for debug
 
-# TODO : Angle P sur hélium
 
 
 
 """
-version 7.0.4 WIP
+version 7.1 publiée
 - ajout detect_edge gestion crop dans detect_bord pour gerer fort tilt et diffusé
 - si erreur detection inversions sur gong, affiche image gong original
-- bug mode couronne y&,y2 etait en dur
+- bug debug couronne y1,y2  en dur
+- amelioration visu trame redressée
+- detection polynome filtre special raie parasite
+- mode couronne calcul polynome sur hauteur disque saturé
+- seuils visu special si mode couronne
+- reduction de bruit 3 et 5 pixels
+- gestion si erreur image free, continue les traitements en lot
+- Angle P sur hélium
+- sauvegarde param BASS2000 dans fichier json
+- amelioration interface bass entete
+- sauvegarde log de console
+- bug fix sur correction helium par batch angle_P
+- modif image4 et doppler float32
 
-Version 7.0.3
-- bug fix sur nom fichier dp, cont avec decalage decimal
-- affiche console valeur de la longueur d'onde selectionnée BASS2000
-- ajout dans inti_finctions detect_bord test si bords trop proche pour eviter lignes sombres
-- test si ligne très sombre dans image moyenne pour detection y1,y2 
-
-Version 7.0.2
-- gestion gros fichier SER
-- sauve flag correction transversalium helium
-- interdit +20%Hor si pas autocrop
-- passage en decimal de cont et dop dans onglet doppler et free_shift1 et free_shift2
-
-Version 7.0.1 
-- replace ',' par '.' pour float (pas sure que cela suffise pour saveini et validators)
-- gestion overflow fichier ser très gros
-
-Version 7.0
-- correction bug angle P annuler si flags weak et trans
-- mise en route de check version
-- suppression saut de ligne sur message de creation inti.yaml
-
-Version 6.9+ 
-- correction bug trad 
-
-Version 6.9 - antibes 5 sept 2025
-- ajout anti-aliasing polynomial
-- recrée un fichier log au nom de l'image enregistrée
-- supprime les accents dans les logs
-
-Version 6.8 - paris 22 aout 2025
-- ajout des params calculette shg autre
-- save fits doppler optionel
-- save settings fenetre gong
-- corrige noms fits avec cont et png cont avec dp
-- ajoute log valeurs de shift
-- corrige trame_profil ecart de 1 dans auto
-- recon avec double passe flat et meme seuils mask
-- recon lecture ram
-- saveas img avec seuils
-
-Version 6.6g -6.7 - post ohp 25
-- supprime sauvegarde du tab current
-- corrige erreur lancement dernier ser
-- amélioration rapidité inti_recon
-- ajout fonction blink et ajustement taille dans gong
-- bug inversion slwidth et slheight, valeur scampix et keyword shgangle
-- Ha2cb passe a 6561.231
-- mode doppler optionnel
-- ajout mode couleur rouge
-
-Version 6.6f - 15 juiller 2025
-- compil trad
-- gestion seuil et format png protus
-
-Version 6.6e - 15 juillet 2025
-- mode couronne zone calcul poly fixe
-- ajuste polynome hors outliers
-- ajout deux mots clefs BASS2000
-
-Version 6.6+ - 28 juin 2025
-- mode CLI un fichier avec option lance ou pas le traitement
-- toujours onglet general au lancement
-- angle P non auto par défaut
-- ajout extension de 20% horizontal sur autocrop
-- amelioration autocrop disque très decentré mais entier
-- ajout save
-- ajout edition crop value
-- evite saturation sur clahe
-- garde les seuils de crop 
-- trame image entiere
-- amélioration interpolation 4 points
-- gestion nom _cont avec shift non nul
-- BASS2000 ajouts de mots-clefs
-- test deg 3 poly: aucune diff, reste en deg2, idem CB test ISIS
-- accepte shift decimal
-
-Version 6.5c - 16 avril 2025
-- Inti avec nouvelle interface en Qt
-- prise en compte de l'angle P sur une serie
-- Correction bug formule dans angle_P_B0 et rotation de carrington
-- test batch fichiers BASS2000
-- correction kept_frame dans inti_recon et frame_index
-- ajout d'une image mean_start de 20 trames autour de l'apparition du spectre en mode free only
-- test image 8 bits
-- detect_edge ajout test +:- clip et gestion hauteur de crop
-- redirection flag pour thread et print
-- image gong et _disk cote à cote
-- choix images à enregistrer
-- image cam_height avec padding pour angle P sur disque partiel
-- case à cocher angle P auto ou pas dans section avancées
-- bouton return par defaut declenche le traitement
-- gestion inversions dans gong avec detection inversions auto
-- detection du max profil sum de trame mean_start
-- choix limité entre mean et mean_start et ne declenche pas calc max si mean
-- bouton effacer contenu console 
-- gestion constante poly négative
-- ajout du gif en plus du mp4
-- affiche fichier trame sans Qfiledialog et sans selecteur meanstart en mode magnet
-- gestion erreurs si pas de fichier et test Flags au lancement
-- ajout mask sur non-unif basse freq correction
-- corrige reference tilt
-- pas d'angle P pour disque partiel et helium transversallium ou magnet
-- pas angle P auto au départ, toujours premier onglet, no more edition polynome
 """
-
-
-# TODO : reduc bruit ajustable
-# TODO : stop dans thread process
-# TODO : memoriser les positions des fenetres images si double écran
 
 
 
@@ -187,7 +91,7 @@ class main_wnd_UI(QMainWindow) :
         #super().__init__(parent)
         super(main_wnd_UI, self).__init__()
 
-        self.version ="7.0.3a"
+        self.version ="7.1"
         #iv = ImageView # force le load d'ImageView avant QUILoader
         # ne change rien...
         
@@ -316,6 +220,7 @@ class main_wnd_UI(QMainWindow) :
         self.ui.inti_go_btn.setDefault(True)
         self.ui.inti_go_btn.setAutoDefault(True)
         self.ui.console_clear_btn.clicked.connect(self.console_clear)
+        self.ui.console_save_btn.clicked.connect(self.console_save)
         self.ui.inti_shift_text.setValidator(validator_2dec)
         
         # database
@@ -494,6 +399,7 @@ class main_wnd_UI(QMainWindow) :
         else :
             self.files_to_save={'disk': True, 'raw':True, 'color' : True, "inv" : False, "mix" :False, "diff" : False, "sum": False, "x0x1x2" : False, "dop":False}
         
+        """
         if settings.value("App/db") is not None :
             valeur_json= settings.value("App/db", "{}")
             self.bass_entete = json.loads(valeur_json)
@@ -503,7 +409,7 @@ class main_wnd_UI(QMainWindow) :
                                 'diaminstru':'0', 'waveID':0, "binID":0, 'reseau':'2400', 'ordre':'1',
                                 'contact':'', 'angle':'24','fentelong':'4.5', 'fentelarg':'10',
                                 'diaph' : '0', 'dfilter' : ''}
-        
+        """
         
         if self.ui.dock_console.isFloating() :
             dock_geometry = self.ui.dock_console.geometry()
@@ -516,9 +422,7 @@ class main_wnd_UI(QMainWindow) :
     
     
     def write_settings(self) :
-        # force docks non floating
-        #self.ui.dock_console.setFloating(False)
-        #self.addDockWidget(Qt.BottomDockWidgetArea, self.ui.dock_console)
+
         self.bass_entete['observer'] = self.ui.db_observer_text.text()
         self.bass_entete['instru'] = self.ui.db_instru_text.text()
         self.bass_entete['lat'] = self.ui.db_lat_text.text()
@@ -536,7 +440,8 @@ class main_wnd_UI(QMainWindow) :
         settings.setValue("App/lang", self.langue)
         #settings.setValue("App/tab_index", self.ui.tab_main.currentIndex())
         settings.setValue("App/save", json.dumps(self.files_to_save))
-        settings.setValue("App/db", json.dumps(self.bass_entete))
+        #settings.setValue("App/db", json.dumps(self.bass_entete))
+        
         #settings.setValue("Shg/foc", self.shg_foc_camera_other)
         #settings.setValue("Shg/angle", self.shg_angle_other)
         
@@ -547,6 +452,8 @@ class main_wnd_UI(QMainWindow) :
         # inti.yaml is a bootstart file to read last directory used by app
         # this file is stored in the module directory
         self.my_ini=data_path('inti.yaml')
+        self.my_bass = data_path('bass_entete.json')
+        
         my_dictini={'directory':'', 'dec doppler':3, 'dec cont':15, 
                     'size_pix_cam':'0.0024', 'bin_cam':'1',
                     'poly_slit_a':0, "poly_slit_b":0,'poly_slit_c':0, 
@@ -563,13 +470,31 @@ class main_wnd_UI(QMainWindow) :
         poly=[]
         Flags=self.Flags
         
+        # lecture fichier ini
         try:
             with open(self.my_ini, "r") as f1:
                 my_dictini = yaml.safe_load(f1)
         except:
-           
            print('Création de inti.yaml : '+ self.my_ini)
-           
+        
+        
+        # lecture fichier bass_entete.json
+        try: 
+            with open(self.my_bass, "r", encoding="utf-8") as f1: 
+                self.bass_entete = json.load(f1) 
+        except FileNotFoundError: 
+            settings=QSettings("Desnoux Buil", "inti_qt")
+            if settings.value("App/db") is not None :
+                valeur_json= settings.value("App/db", "{}")
+                self.bass_entete = json.loads(valeur_json)
+            else :
+                self.bass_entete ={'observer':'', 'instru':'','wave_label':'Manual', 'lat':'0', 'long':'0',
+                                   'camera':'', 'spectro':'SOLEX',"pixel":'0','objcollim':'80', 'objcam':'125', 'focinstru':'0',
+                                    'diaminstru':'0', 'waveID':0, "binID":0, 'reseau':'2400', 'ordre':'1',
+                                    'contact':'', 'angle':'24','fentelong':'4.5', 'fentelarg':'10',
+                                    'diaph' : '0', 'dfilter' : ''}
+            
+         
         
         self.working_dir=my_dictini['directory']
         self.dec_pix_dop=int(my_dictini['dec doppler'])
@@ -681,9 +606,9 @@ class main_wnd_UI(QMainWindow) :
         if 'reduction_bruit' not in my_dictini:
             # si pas dans fichier ini
             my_dictini['reduction_bruit']=0
-            Flags['NOISEREDUC'] = 0
+            Flags['NOISEREDUC3'] = 0
         else :
-            Flags['NOISEREDUC']=my_dictini['reduction_bruit']
+            Flags['NOISEREDUC3']=my_dictini['reduction_bruit']
             
         if 'angP auto' not in my_dictini:
             # si pas dans fichier ini
@@ -734,7 +659,8 @@ class main_wnd_UI(QMainWindow) :
         self.polynome = poly
         
         # met à jour l'interface UI
-        self.ui.section_reduc_chk.setChecked(self.Flags['NOISEREDUC'])
+        self.ui.section_reduc_chk.setChecked(self.Flags['NOISEREDUC3'])
+        self.ui.section_reduc_combo.setCurrentIndex = 1
         self.ui.section_autocrop_chk.setChecked(self.Flags['Autocrop'])
         self.ui.inti_h20_radio.setChecked(self.Flags['h20percent'])
         self.ui.section_zoom_chk.setChecked(self.Flags['zoom'])
@@ -800,7 +726,8 @@ class main_wnd_UI(QMainWindow) :
         else :
             self.Flags['POL'] =False
             
-        self.Flags['NOISEREDUC']=self.ui.section_reduc_chk.isChecked()
+        self.Flags['NOISEREDUC3']=self.ui.section_reduc_chk.isChecked() and self.ui.section_reduc_combo.currentIndex()==0
+        self.Flags['NOISEREDUC5']=self.ui.section_reduc_chk.isChecked() and self.ui.section_reduc_combo.currentIndex()==1
         self.Flags['Autocrop']=self.ui.section_autocrop_chk.isChecked()
         self.Flags['zoom']=self.ui.section_zoom_chk.isChecked()
         self.Flags["FORCE_FREE_MAGN"]=self.ui.free_tilt_chk.isChecked() or self.ui.magnet_tilt_chk.isChecked() 
@@ -845,7 +772,7 @@ class main_wnd_UI(QMainWindow) :
         self.my_dictini['trame couronne2']=self.param[5]
         self.my_dictini['force_free_magn'] = Flags["FORCE_FREE_MAGN"]
         self.my_dictini['zeeman_shift'] = self.Shift[4]
-        self.my_dictini['reduction_bruit'] = Flags['NOISEREDUC']
+        self.my_dictini['reduction_bruit'] = Flags['NOISEREDUC3']
         self.my_dictini['angP auto']= self.ui.section_angP_auto_chk.isChecked()
         
         
@@ -896,13 +823,22 @@ class main_wnd_UI(QMainWindow) :
             self.my_dictini['poly_free_c']=float(self.polynome[2])
         
             
-        # sauvegarde
+        # sauvegarde fichier ini
         try:
             with open(self.my_ini, "w") as f1:
                 yaml.dump(self.my_dictini, f1, sort_keys=False)
                 #print(self.my_ini)
         except :
             print (self.tr('Erreur à la sauvegarde de inti_ini.yaml : '), self.my_ini)
+
+
+        # Sauvegarde des paramètres BASS dans bass_entete.json
+        try:
+            with open(self.my_bass, "w", encoding="utf-8") as f1:
+                json.dump(self.bass_entete, f1, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print("Erreur à la sauvegarde de bass_entete.json :", self.my_bass, e)
+
 
     def add_text(self, text) :
         self.ui.log_edit.append(text)
@@ -956,7 +892,7 @@ class main_wnd_UI(QMainWindow) :
                         
                         self.img_list.append(myimg)
                         self.img_list[-1].show()
-                        self.img_list[-1].set_img(img_proc)
+                        self.img_list[-1].set_img(img_proc, False)
                         self.img_list[-1].set_title(self.short_name(f))
                         self.img_list[-1].on_ferme.connect(self.img_allclose)
                         self.img_list[-1].set_file_name(f)
@@ -1071,7 +1007,8 @@ class main_wnd_UI(QMainWindow) :
                 # conditions pour ne pas appliquer la rotation d'angle P 
                 if  (self.Flags["WEAK"] and self.Flags["FREE_TRANS"]) or self.Flags['POL'] or not(self.ui.section_angP_auto_chk.isChecked()):
                     self.ang_P = 0
-                    self.ui.section_angP_auto_chk.setChecked(False)
+                    if self.Flags['POL'] :
+                        self.ui.section_angP_auto_chk.setChecked(False)
                 
                 # demarre la boucle avec le lancement du premier fichier
                 # recupère les resultats sur un signal emis par le thread
@@ -1295,9 +1232,16 @@ class main_wnd_UI(QMainWindow) :
             self.basefich_bass="BASS2000"+os.path.sep+self.basefich
             self.basefich_clahe="Clahe"+os.path.sep+self.basefich
             #print(self.basefich)
+            
+            # conditions pour ne pas appliquer la rotation d'angle P 
+            if  (self.Flags["WEAK"] and self.Flags["FREE_TRANS"]) or self.Flags['POL'] or not(self.ui.section_angP_auto_chk.isChecked()):
+                self.ang_P = 0
+                if self.Flags['POL'] :
+                    self.ui.section_angP_auto_chk.setChecked(False)
+                    
             #
             # ------------------------------------------------------------------------------------                     
-            # appel au module d'extraction, reconstruction et correction
+            # appel au module d'extraction, reconstruction et correction en boucle
             # ------------------------------------------------------------------------------------     
             debug_nothread = False
             
@@ -1414,7 +1358,7 @@ class main_wnd_UI(QMainWindow) :
         # disk protus # modif pour Qt après test 585
         #---------------------------------------------------------------------
         frame2=np.copy(frames[0])
-        disk_limit_percent=0.0015 # black disk radius inferior by 3.5% to disk edge (was 2%) -june25
+        disk_limit_percent=0.0015 # black disk radius inferior by 1.5% to disk edge (was 2%) -june25
         if cercle[0]!=0:
             x0=cercle[0]
             y0=cercle[1]
@@ -1441,8 +1385,8 @@ class main_wnd_UI(QMainWindow) :
             
         # disk clahe
         #---------------------------------------------------------------------
-        #clahe = cv2.createCLAHE(clipLimit=0.8, tileGridSize=(2,2))
-        clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(2,2))
+        clahe = cv2.createCLAHE(clipLimit=0.8, tileGridSize=(2,2))
+        #clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(2,2))
         cl1 = clahe.apply(frames[0])
         #cc = seuil_image_percent (cl1, 99.9999, 25, 1.05)
         cc = seuil_image_percent (cl1, 99.9999, 25, 1)
@@ -1472,13 +1416,13 @@ class main_wnd_UI(QMainWindow) :
                     img_doppler=np.zeros([frames[1].shape[0], frames[1].shape[1], 3],dtype='uint8')
                     img_doppler_ec=np.zeros([frames[1].shape[0], frames[1].shape[1], 3],dtype='uint8')
                     if self.Flags["VOL"] :
-                        f1=np.array(frames[1], dtype="float64")
-                        fn=np.array(frames[len(frames)-1], dtype="float64")
-                        moy=np.array(((f1+fn)/2), dtype='float64')
+                        f1=np.array(frames[1], dtype="float32")
+                        fn=np.array(frames[len(frames)-1], dtype="float32")
+                        moy=np.array(((f1+fn)/2), dtype='float32')
                     else:
-                        f1=np.array(frames[1], dtype="float64")
-                        f2=np.array(frames[2], dtype="float64")
-                        moy=np.array(((f1+f2)/2), dtype='float64') 
+                        f1=np.array(frames[1], dtype="float32")
+                        f2=np.array(frames[2], dtype="float32")
+                        moy=np.array(((f1+f2)/2), dtype='float32') 
                         # on equilibre les plans
                         lum_roi1 = get_lum_moyenne(f1) # calcul moyenne au centre sur zone de 200x200
                         lum_roi2 = get_lum_moyenne(f2)
@@ -1640,7 +1584,6 @@ class main_wnd_UI(QMainWindow) :
                     Seuil_bas=0
                     Seuil_haut=int(np.percentile(img_weak_uint,99.99))
                     
-                    
                     #print("free seuils : ", Seuil_bas, Seuil_haut)
                     if (Seuil_haut-Seuil_bas) != 0 :
                         img_weak=seuil_image_force(img_weak_uint, Seuil_haut, Seuil_bas)
@@ -1657,9 +1600,6 @@ class main_wnd_UI(QMainWindow) :
                             print("Pas de correction de transversallium sur un disque partiel")
                         else :
                             result_image = corrige_trans_helium(img_weak, R)
-                            
-                            #DiskHDU=fits.PrimaryHDU(result_image,header)
-                            #DiskHDU.writeto(self.basefich+'_qt_test1.fits', overwrite='True')
                             
                             # On ajoute le continuum méthode sunscan
                             image1 = np.array(result_image, dtype=np.int32) 
@@ -1685,6 +1625,21 @@ class main_wnd_UI(QMainWindow) :
                             mask = create_circular_mask((height, width), center, radius, feather_width)
                             # Blend the images
                             img_weak = blend_images(img_weak, result_image, mask)
+                            
+                            #---- Applique angle P 
+                            if self.ui.section_angP_auto_chk.isChecked() :
+                                if self.ui.ori_angP_text.text() == '' :
+                                    self.ang_P = 0 
+                                else :
+                                    try :
+                                        self.ang_P=float(self.ui.ori_angP_text.text())
+                                    except :
+                                        print(self.tr('erreur format angle P'))
+                                        self.ang_P=0
+                                diam = int(R*2)
+                                centreX=img_weak.shape[1]//2 
+                                centreY=img_weak.shape[0]//2
+                                img_weak = img_rotate(img_weak, self.ang_P, centreX, centreY, diam)
                     #
                     img_weak=np.array(img_weak, dtype='uint16')
                     img_weak=cv2.flip(img_weak,0)
@@ -1700,6 +1655,10 @@ class main_wnd_UI(QMainWindow) :
                 #sauvegarde en png de raie libre 
                 if flag_erreur_weak==False:
                     cv2.imwrite(self.basefich+'_free'+'.png',img_weak)
+        else :
+            # si on a une seule image mais qu'on est en mode libre
+            if self.Flags["WEAK"] :
+                flag_erreur_weak=True
                     
 # ------------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------------
@@ -1709,10 +1668,10 @@ class main_wnd_UI(QMainWindow) :
         self.img_list=[]
         self.myzoom_wnd=zoom_wnd()
         
-        if len(disks)<=4 :
-            self.image4.append(disks[3])
-        else :
-            self.image4.append(disks[4])
+        #if len(disks)<=4 :
+            #self.image4.append(disks[3])
+        #else :
+            #self.image4.append(disks[4])
         
         if self.Flags['zoom'] :
             
@@ -1726,7 +1685,10 @@ class main_wnd_UI(QMainWindow) :
             
             self.img_list.append(myimg)
             self.img_list[-1].show()
-            self.img_list[-1].set_img(disks[i])
+            if self.Flags['Couronne'] and suff[i]=="free" :
+                self.img_list[-1].set_img(disks[i],True)
+            else:
+                self.img_list[-1].set_img(disks[i],False)
             if suff[i] == 'doppler' :
                 suff[i] = suff[i]+dp_str
             if suff[i] == 'cont' :
@@ -1968,28 +1930,32 @@ class main_wnd_UI(QMainWindow) :
  
         frame2=np.copy(frames[0])
         if self.Flags['WEAK']:
-            frame2=np.copy(img_weak_array)
-            DiskHDU=fits.PrimaryHDU(frame2,header)
-            DiskHDU.writeto(self.basefich+'_free.fits', overwrite='True')
-            if len(self.serfiles)>1 :
-                DiskHDU.writeto(self.basefich+'_free-'+str(ii)+'.fits', overwrite='True')
-            frame3=np.copy(img_diff)
-            # sauve la différence
-            if self.files_to_save['diff'] : 
-                DiskHDU=fits.PrimaryHDU(frame3,header)
-                DiskHDU.writeto(self.basefich_comple+'_diff.fits', overwrite='True')
-            # sauve les images individuelles pour debug
-            if self.files_to_save['x0x1x2']:
-                DiskHDU=fits.PrimaryHDU(fr0,header)
-                DiskHDU.writeto(self.basefich_comple+'_x0.fits', overwrite='True')
-                DiskHDU=fits.PrimaryHDU(fr1,header)
-                DiskHDU.writeto(self.basefich_comple+'_x1.fits', overwrite='True')
-                DiskHDU=fits.PrimaryHDU(fr2,header)
-                DiskHDU.writeto(self.basefich_comple+'_x2.fits', overwrite='True')
-            # sauve la somme
-            if self.files_to_save['sum'] :
-                DiskHDU=fits.PrimaryHDU(moy,header)
-                DiskHDU.writeto(self.basefich_comple+'_sum.fits', overwrite='True')
+            if flag_erreur_weak :
+                print ("Erreur image free: "+ self.basefich)
+                flag_erreur_weak = False
+            else : 
+                frame2=np.copy(img_weak_array)
+                DiskHDU=fits.PrimaryHDU(frame2,header)
+                DiskHDU.writeto(self.basefich+'_free.fits', overwrite='True')
+                if len(self.serfiles)>1 :
+                    DiskHDU.writeto(self.basefich+'_free-'+str(ii)+'.fits', overwrite='True')
+                frame3=np.copy(img_diff)
+                # sauve la différence
+                if self.files_to_save['diff'] : 
+                    DiskHDU=fits.PrimaryHDU(frame3,header)
+                    DiskHDU.writeto(self.basefich_comple+'_diff.fits', overwrite='True')
+                # sauve les images individuelles pour debug
+                if self.files_to_save['x0x1x2']:
+                    DiskHDU=fits.PrimaryHDU(fr0,header)
+                    DiskHDU.writeto(self.basefich_comple+'_x0.fits', overwrite='True')
+                    DiskHDU=fits.PrimaryHDU(fr1,header)
+                    DiskHDU.writeto(self.basefich_comple+'_x1.fits', overwrite='True')
+                    DiskHDU=fits.PrimaryHDU(fr2,header)
+                    DiskHDU.writeto(self.basefich_comple+'_x2.fits', overwrite='True')
+                # sauve la somme
+                if self.files_to_save['sum'] :
+                    DiskHDU=fits.PrimaryHDU(moy,header)
+                    DiskHDU.writeto(self.basefich_comple+'_sum.fits', overwrite='True')
             
         if self.Flags['DOPCONT'] and not self.Flags['Contonly'] :
             if self.files_to_save['dop']:
@@ -2060,7 +2026,8 @@ class main_wnd_UI(QMainWindow) :
         
         self.Flags["ALLFITS"] = True #historic      
         self.Flags["RTDISP"] = self.ui.section_realtime_chk.isChecked()
-        self.Flags['NOISEREDUC']=self.ui.section_reduc_chk.isChecked()
+        self.Flags['NOISEREDUC3']=self.ui.section_reduc_chk.isChecked() and self.ui.section_reduc_combo.currentIndex() == 0
+        self.Flags['NOISEREDUC5']=self.ui.section_reduc_chk.isChecked() and self.ui.section_reduc_combo.currentIndex() == 1
         self.Flags['Autocrop']=self.ui.section_autocrop_chk.isChecked()
         self.Flags["SAVEPOLY"]=self.ui.section_savepoly_chk.isChecked()
         self.Flags['Grid']=self.ui.section_grid_chk.isChecked()
@@ -2523,9 +2490,12 @@ class main_wnd_UI(QMainWindow) :
                 # basefich: nom du fichier ser sans extension et sans repertoire
                 self.basefich='_'+os.path.splitext(base)[0]
                 f1 = self.basefich+"_mean.fits"
-                if self.Flags['WEAK'] and not self.Flags['Couronne']:
-                    f2 = self.basefich+"_mean_start.fits"
+                f2 = self.basefich+"_mean_start.fits"
+                if self.Flags['WEAK'] and not self.Flags['Couronne']and not self.Flags['FREE_TRANS']:
                     f, m_ext = self.trame_sel_file (f1,f2)
+                elif  self.Flags['WEAK'] and  self.Flags['FREE_TRANS']:
+                    m_ext='start'
+                    f=f2
                 else :
                     m_ext=''
                     f= f1
@@ -2580,6 +2550,10 @@ class main_wnd_UI(QMainWindow) :
     
     def console_clear (self):
         self.ui.log_edit.setText('INTI Version : ' + str(self.version))
+        
+    def console_save (self):
+        Path(self.working_dir, "console.txt").write_text(self.ui.log_edit.toPlainText(), encoding="utf-8")
+        print(self.tr("Fichier console.txt"))
         
     def update_constante(self):
         self.Flags["POL"]=False
@@ -2769,10 +2743,13 @@ class img_wnd(QMainWindow) :
         #print("emit")
         self.on_ferme.emit()
     
-    def set_img(self, img_data) :
+    def set_img(self, img_data, flag_auto) :
         img_proc = np.fliplr(np.rot90(img_data, 3))
         self.ui.inti_view.setImage(img_proc)
-        #self.ui.inti_view.setLevels(0,65535)
+        if flag_auto :
+            sb= np.percentile(img_data,3)
+            sh = np.percentile(img_data,99.5)
+            self.ui.inti_view.setLevels(sb,sh)
     
     def set_vol(self, img_data) :
         #img_proc = np.fliplr(np.rot90(img_data, 3))
@@ -4526,6 +4503,19 @@ def disk_gauss (img, cx, cy, radius, flou) :
     alpha = mask_flou.astype(np.float32) / 65535.0
     img_result = (img.astype(np.float32) * (1.0 - alpha)).astype(np.uint16)
     return img_result
+
+def safe_int(text, default=0):
+    try:
+        return int(text.strip())
+    except (ValueError, AttributeError):
+        return default
+
+def safe_float(text, default=0.0):
+    try:
+        # Gère le point et la virgule comme séparateur décimal
+        return float(text.strip().replace(',', '.'))
+    except (ValueError, AttributeError):
+        return default
     
     
 def resource_path(relative_path):

@@ -350,7 +350,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
     
     # calcul de l'image moyenne
     myimg=mydata/(kept_frame-1)             # Moyenne sur les kept frame
-    myimg=np.array(myimg, dtype='uint16')   # Passe en entier 16 bits
+    myimg=np.clip(myimg, 0, 65535).astype(np.uint16)  # Passe en entier 16 bits
     ih= int(hdr['NAXIS2'])                    # Hauteur de l'image
     iw= int(hdr['NAXIS1'])                    # Largeur de l'image
     myimg=np.reshape(myimg, (ih, iw))   # Forme tableau X,Y de l'image moyenne
@@ -410,6 +410,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         # mode couronne pour calcul polynome
         if flag_corona :
             savefich="Complements"+os.path.sep+basefich+'_mean'  
+            myimg_sat= np.copy(myimg)
             myimg=np.copy(mytrame)
         else :
             savefich="Complements"+os.path.sep+basefich+'_mean_start'              
@@ -460,10 +461,18 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
     # detect up and down limit of the spectrum of the mean image
     y1,y2=detect_bord(myimg, axis=1, offset=5, flag_disk=False)
     
-    #if flag_corona :
-       #y1= 100
-       #y2=ih-100
-        
+    if flag_corona and 1==1:
+       y1,y2=detect_bord(myimg_sat, axis=1, offset=5, flag_disk=False)
+       # on deborde un peu du disque en faisant le pari
+       # que l'image predisk montre les raies sur quasi la hauteur de la fente
+       # hypothese valide uniquement pour sunscan
+       """
+       y1=int(y1*0.8) # 10 pourcent de marge
+       if y2*1.2 >= ih :
+           y2= ih-1
+       else :
+           y2=int(y2*1.2)
+       """
     
     # calcul profile spectral en bonus
     pro = bin_to_spectre(myimg,y1,y2)
@@ -538,26 +547,80 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
             MinX=np.array(posx)
             LineRecal=1
         
-        # ajustement robuste polynome
+        # amelioration polynome malgre raie parasite
+        def fit_poly_two_populations(MinX,IndY,deg=2,tol=2.0,min_sep=5.0):
+            x=np.asarray(MinX,dtype=float)
+            y=np.asarray(IndY,dtype=float)
+        
+            if len(x)<2*(deg+1):
+                return None,None
+        
+            # Tri selon X
+            order=np.argsort(x)
+            xs=x[order]
+        
+            # Recherche des séparations possibles
+            gaps=np.diff(xs)
+            split_indices=np.where(gaps>=min_sep)[0]
+        
+            if len(split_indices)==0:
+                # Pas de deuxième population évidente
+                return IndY, MinX
+        
+        
+            for split in split_indices:
+        
+                threshold=(xs[split]+xs[split+1])/2
+        
+                group1=x<=threshold
+                group2=x>threshold
+        
+                n1=np.sum(group1)
+                n2=np.sum(group2)
+            
+                # Si un des groupes est trop petit pour un ajustement,
+                # on le considère comme un groupe d'outliers
+                if n1<deg+1 and n2>=deg+1:
+                    group=group2
+                elif n2<deg+1 and n1>=deg+1:
+                    group=group1
+                elif n1<deg+1 and n2<deg+1:
+                    continue
+                else:
+                    # Les deux groupes sont suffisamment grands :
+                    # la plus grande population est la population principale
+                    if n1>n2:
+                        group=group1
+                    else:
+                        group=group2
+            
+                my_minX=x[group]
+                my_indY=y[group]
+
+            return my_indY, my_minX
+            
         if deg == 2 :
-            sigma_clip=6.0 
+            my_indY, my_minX = fit_poly_two_populations(MinX,IndY,deg=2,tol=2.0,min_sep=5.0)
+            
+            sigma_clip=3.0 
             K=2
-            
-            mask = np.ones_like(MinX, dtype=bool)
-            
+             
+            mask = np.ones_like(my_minX, dtype=bool)
+             
             # detection outliers en K passes
             for _ in range(K):
-                p=np.polyfit(IndY[mask],MinX[mask],2)
+                p=np.polyfit(my_indY[mask],my_minX[mask],2)
                 #p=np.polyfit(IndY,MinX,2)
-                fitted_x=np.polyval(p, IndY)
-                residus = MinX-fitted_x
+                fitted_x=np.polyval(p, my_indY)
+                residus = my_minX-fitted_x
                 std = np.std(residus[mask])
                 mask = np.abs(residus) < sigma_clip * std
-            
-            # Calcul de l'erreur RMS
-            #rms = np.sqrt(np.mean((MinX[mask] - fitted_x[mask])**2))
-           # print(f"\nErreur RMS de l’ajustement polynome : {rms:.3f} pixels")
+             
+             # Calcul de l'erreur RMS
+             #rms = np.sqrt(np.mean((MinX[mask] - fitted_x[mask])**2))
+            # print(f"\nErreur RMS de l’ajustement polynome : {rms:.3f} pixels")
 
+        
         else :
             # test rms -no diff, idem sous ISIS
             # on reste en deg2
@@ -661,12 +724,14 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
     posX_min_slit=int(min(xi[PosRaieHaut], xi[PosRaieBas]))
     posX_max_slit=int(max(xi[PosRaieHaut], xi[PosRaieBas]))
     
+    #---- debug_poly
     debug_poly=False # attention plante si on recalcule pas le polynome (free not auto)
     
     if debug_poly :
         imgplot1 = plt.imshow(myimg)
         plt.scatter(xdec,y,s=0.1, marker='.', edgecolors=('red'))
         plt.show()
+        #plt.pause(0.001)
         #plt.scatter(vals,np.arange(ih),s=0.1, marker='.', edgecolors=('green'))
         
         #plt.scatter(MinX[mask],IndY[mask],s=0.1, marker='.', edgecolors=('blue'))
@@ -675,6 +740,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         plt.scatter(xdec,y,s=0.1, marker='.', edgecolors=('red'))
         #plt.scatter(xi,y,s=0.1, marker='.', edgecolors=('green'))
         plt.show()
+
   
     
     # Test position de la fente décalée par rapport aux bords de l'image
@@ -683,7 +749,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         shift_max=range_dec[len(range_dec)-1]
         shift_min=range_dec[1]
 
-        if ((posX_min_slit-shift_max)<=2) or ((posX_max_slit+shift_max)>=iw-3):
+        if ((posX_min_slit-shift_max)<=2) or ((posX_max_slit+shift_max)>=iw-1): #was 3
             v=min(posX_min_slit-2, iw-posX_max_slit-3)
             logme('*******************************')
             if cfg.LG == 1:
@@ -734,18 +800,26 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
     
     Disk=[]
     
+   
+    #---- reduc bruit img ou pixels
+    reduc_img= False
+    
+    
     # TODO : verif reduc noise si on applique un shift
    
-    # reduction de bruit - moyenne de 3 colonnes
-    if len(range_dec)==1 and Flags["NOISEREDUC"] == 1 :
-        range_dec_ref=range_dec
-        range_dec=[0,-1,1]
-    if Flags["WEAK"] and Flags["NOISEREDUC"] == 1 :
-        range_dec_ref=range_dec
-        range_dec=[0,-1,1,Shift[1]-1, Shift[1], Shift[1]+1,Shift[2]-1,Shift[2],Shift[2]+1]
-    if Flags["POL"] and Flags["NOISEREDUC"] == 1 :
-        range_dec_ref=range_dec
-        range_dec=[0,-1,1,-shift_vol-1, -shift_vol, -shift_vol+1,shift_vol-1,shift_vol,shift_vol+1]
+    if reduc_img : # image combinés 
+        # reduction de bruit - moyenne de 3 colonnes
+        if len(range_dec)==1 and Flags["NOISEREDUC3"] == 1 :
+            range_dec_ref=range_dec
+            range_dec=[0,-1,1]
+        if Flags["WEAK"] and Flags["NOISEREDUC3"] == 1 :
+            range_dec_ref=range_dec
+            range_dec=[0,-1,1,Shift[1]-1, Shift[1], Shift[1]+1,Shift[2]-1,Shift[2],Shift[2]+1]
+        if Flags["POL"] and Flags["NOISEREDUC3"] == 1 :
+            range_dec_ref=range_dec
+            range_dec=[0,-1,1,-shift_vol-1, -shift_vol, -shift_vol+1,shift_vol-1,shift_vol,shift_vol+1]
+    
+    
 
     
     for k in range_dec:
@@ -816,7 +890,41 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
             # rotation éventuelle
             if flag_rotate:
                 block = np.flip(block.swapaxes(1, 2), axis=1)
-    
+            
+            if not reduc_img :
+                # nombre de pixels utilisés pour l'extraction : 1, 3 ou 5
+                if Flags["NOISEREDUC3"] == 1 :
+                    nb_pixels = 3
+                    if cfg.LG == 1 :
+                        logme("Option Reduction de Bruit 3 pix")
+                    else :
+                        logme("Noise reduction option 3 pix")
+                
+                elif Flags["NOISEREDUC5"] == 1:
+                    nb_pixels = 5
+                    if cfg.LG == 1 :
+                        logme("Option Reduction de Bruit 5 pix")
+                    else :
+                        logme("Noise reduction option 5 pix")
+                else :
+                    nb_pixels = 1
+                    
+                #TODO Cas reduc 5
+                
+                if nb_pixels == 1:
+                    offsets_pixels = [0]
+                    weights_pixels = np.array([1.0], dtype=np.float64)
+                elif nb_pixels == 3:
+                    offsets_pixels = [-1, 0, 1]
+                    weights_pixels = np.array([0.25, 0.50, 0.25], dtype=np.float64)
+                elif nb_pixels == 5:
+                    offsets_pixels = [-2, -1, 0, 1, 2]
+                    weights_pixels = np.array([0.1, 0.2, 0.4, 0.2, 0.1], dtype=np.float64)
+                else:
+                    raise ValueError("nb_pixels doit être 1, 3 ou 5")
+                    
+
+   
             # --- ici tu fais tes calculs frame par frame ---
             for j in range(n_to_read):
                 frame_abs_index = frame_index + j
@@ -834,43 +942,97 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
                         
                 # Boucle sur les decalages
                 i=0
-             
-                # --- Précalcul des coefficients pour une fenêtre de 7 points et polyorder=2 ---
-                # filtre polynomiale antialiasing sans reduction de la resolution spectrale
-                coeffs = np.array([-2, 3, 6, 7, 6, 3, -2], dtype=np.float32) / 21.0
-                offsets = np.array([-1.5,-1,-0.5,0,0.5, 1,1.5])
+                
+                
+                if not reduc_img : #mode integré reduc :
+                    # --- Précalcul des coefficients pour une fenêtre de 7 points et polyorder=2 ---
+                    # filtre polynomial antialiasing sans réduction de la resolution spectrale
+                    coeffs = np.array([-2, 3, 6, 7, 6, 3, -2], dtype=np.float32) / 21.0
+                    offsets = np.array([-1.5, -1, -0.5, 0, 0.5, 1, 1.5])
                     
-                for i in range(0,len(range_dec)): 
+                    for i in range(len(range_dec)):
                     
-                    I_samples = np.zeros((ih, len(offsets)), dtype=np.float32)
-                   
+                        I_samples = np.zeros((ih, len(offsets)), dtype=np.float32)
                     
-                    for idx, dx in enumerate(offsets):
-                        # Position fractionnaire
-                        pos = x_floors[i] + dx +t[i]
-                        pos_floor = np.floor(pos).astype(int)
-                        frac = pos - pos_floor
-                        try :
-                            pt0=np.float64(img[np.arange(ih), pos_floor-1])
-                            pt1=np.float64(img[np.arange(ih), pos_floor])
-                            pt2=np.float64(img[np.arange(ih), pos_floor+1])
-                            pt3=np.float64(img[np.arange(ih), pos_floor+2])
-                            img4=[pt0,pt1,pt2,pt3]
-                            I_samples[:, idx] = catmull_rom_vectorized(img4, frac)
-                        except :
-                            # a priori erreur catchée par bornes
-                            I_samples[:,idx]= pt1
+                        for idx, dx in enumerate(offsets):
+                    
+                            # Position fractionnaire centrale
+                            pos = x_floors[i] + dx + t[i]
+                    
+                            # Somme pondérée des pixels adjacents
+                            intensite = np.zeros(ih, dtype=np.float64)
+                    
+                            for dp, weight in zip(offsets_pixels, weights_pixels):
+                    
+                                # Position fractionnaire du pixel adjacent
+                                pos_p = pos + dp
+                    
+                                pos_floor = np.floor(pos_p).astype(int)
+                                frac = pos_p - pos_floor
+                    
+                                try:
+                                    pt0 = np.float64(img[np.arange(ih), pos_floor - 1])
+                                    pt1 = np.float64(img[np.arange(ih), pos_floor])
+                                    pt2 = np.float64(img[np.arange(ih), pos_floor + 1])
+                                    pt3 = np.float64(img[np.arange(ih), pos_floor + 2])
+                    
+                                    img4 = [pt0, pt1, pt2, pt3]
+                    
+                                    # interpolation fractionnaire puis pondération
+                                    intensite += weight * catmull_rom_vectorized(img4, frac)
+                    
+                                except:
+                                    # a priori erreur catchée par bornes
+                                    intensite += weight * pt1
+                    
+                            # intensité finale du point spectral
+                            I_samples[:, idx] = intensite
+                    
+                        # filtre antialiasing 7 points
+                        IntensiteRaie = I_samples @ coeffs
+                    
+                        # converti en 16 bits
+                        IntensiteRaie = np.clip(IntensiteRaie, 0, 65535).astype(np.uint16)
+                    
+                        # Ajoute au tableau disk
+                        Disk[i][:, frame_abs_index] = IntensiteRaie
+                else : #mode original
+                    # --- Précalcul des coefficients pour une fenêtre de 7 points et polyorder=2 ---
+                    # filtre polynomiale antialiasing sans reduction de la resolution spectrale
+                    coeffs = np.array([-2, 3, 6, 7, 6, 3, -2], dtype=np.float32) / 21.0
+                    offsets = np.array([-1.5,-1,-0.5,0,0.5, 1,1.5])
                         
-                    
-                    IntensiteRaie = I_samples @ coeffs
-                    # IntensiteRaie = I_samples[:,3] si on enleve l'antialiasing
-                    
-                                
-                    # converti en 16 bits
-                    IntensiteRaie=np.clip(IntensiteRaie,0,65535).astype(np.uint16)
-        
-                    # Ajoute au tableau disk 
-                    Disk[i][:,frame_abs_index]=IntensiteRaie
+                    for i in range(0,len(range_dec)): 
+                        
+                        I_samples = np.zeros((ih, len(offsets)), dtype=np.float32)
+                       
+                        
+                        for idx, dx in enumerate(offsets):
+                            # Position fractionnaire
+                            pos = x_floors[i] + dx +t[i]
+                            pos_floor = np.floor(pos).astype(int)
+                            frac = pos - pos_floor
+                            try :
+                                pt0=np.float64(img[np.arange(ih), pos_floor-1])
+                                pt1=np.float64(img[np.arange(ih), pos_floor])
+                                pt2=np.float64(img[np.arange(ih), pos_floor+1])
+                                pt3=np.float64(img[np.arange(ih), pos_floor+2])
+                                img4=[pt0,pt1,pt2,pt3]
+                                I_samples[:, idx] = catmull_rom_vectorized(img4, frac)
+                            except :
+                                # a priori erreur catchée par bornes
+                                I_samples[:,idx]= pt1
+                            
+                        
+                        IntensiteRaie = I_samples @ coeffs
+                        # IntensiteRaie = I_samples[:,3] si on enleve l'antialiasing
+                        
+                                    
+                        # converti en 16 bits
+                        IntensiteRaie=np.clip(IntensiteRaie,0,65535).astype(np.uint16)
+            
+                        # Ajoute au tableau disk 
+                        Disk[i][:,frame_abs_index]=IntensiteRaie
           
                 
                 # Display reconstruction of the disk refreshed every 30 lines
@@ -896,34 +1058,36 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
     if image_queue is not None :
         image_queue.put(('stop',None, 0))
     
-    # reduction de bruit - moyenne de 3 colonnes
-    if (kend == 1 and Flags["NOISEREDUC"] ==1)  or (Flags["NOISEREDUC"]== 1 and Flags["WEAK"]) or (Flags["NOISEREDUC"]== 1 and Flags["POL"]) :
-        d0=np.array(Disk[0], dtype='float64')
-        d1=np.array(Disk[1], dtype='float64')
-        d2=np.array(Disk[2], dtype='float64')
-        disk_reducnoise = (d0+d1*0.5+d2*0.5) / 2
-        Disk[0]=np.array(disk_reducnoise, dtype='uint16')
-        if Flags["WEAK"] or Flags["POL"] :
-            d3=np.array(Disk[3], dtype='float64')
-            d4=np.array(Disk[4], dtype='float64')
-            d5=np.array(Disk[5], dtype='float64')
-            disk_reducnoise = (d3*0.5+d4+d5*0.5) / 2
-            Disk[1]=np.array(disk_reducnoise, dtype='uint16')
-            d6=np.array(Disk[6], dtype='float64')
-            d7=np.array(Disk[7], dtype='float64')
-            d8=np.array(Disk[8], dtype='float64')
-            disk_reducnoise = (d6*0.5+d7+d8*0.5) / 2
-            Disk[2]=np.array(disk_reducnoise, dtype='uint16')
-            del Disk[3:]
-
-
-        range_dec = range_dec_ref
-        kend=len(range_dec)
-        if cfg.LG == 1 :
-            logme("Option Reduction de Bruit")
-        else :
-            logme("Noise reduction option")
-
+    if reduc_img :
+        # reduction de bruit - moyenne de 3 colonnes
+        if (kend == 1 and Flags["NOISEREDUC3"] ==1)  or (Flags["NOISEREDUC3"]== 1 and Flags["WEAK"]) or (Flags["NOISEREDUC3"]== 1 and Flags["POL"]) :
+            d0=np.array(Disk[0], dtype='float64')
+            d1=np.array(Disk[1], dtype='float64')
+            d2=np.array(Disk[2], dtype='float64')
+            disk_reducnoise = (d0+d1*0.5+d2*0.5) / 2
+            Disk[0]=np.array(disk_reducnoise, dtype='uint16')
+            if Flags["WEAK"] or Flags["POL"] :
+                d3=np.array(Disk[3], dtype='float64')
+                d4=np.array(Disk[4], dtype='float64')
+                d5=np.array(Disk[5], dtype='float64')
+                disk_reducnoise = (d3*0.5+d4+d5*0.5) / 2
+                Disk[1]=np.array(disk_reducnoise, dtype='uint16')
+                d6=np.array(Disk[6], dtype='float64')
+                d7=np.array(Disk[7], dtype='float64')
+                d8=np.array(Disk[8], dtype='float64')
+                disk_reducnoise = (d6*0.5+d7+d8*0.5) / 2
+                Disk[2]=np.array(disk_reducnoise, dtype='uint16')
+                del Disk[3:]
+    
+    
+            range_dec = range_dec_ref
+            kend=len(range_dec)
+            if cfg.LG == 1 :
+                logme("Option Reduction de Bruit")
+            else :
+                logme("Noise reduction option")
+    
+    
     # !!!! special serbannes fente photometrique
     # !!! special crop pour serbannes fente photometrique
     #hdr['NAXIS2']=hdr['NAXIS2'] -200
@@ -1320,8 +1484,8 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
                 # traitement du cas ou le disque est saturé - cas de la couronne solaire raie verte
                 moy_profil=np.mean(ToSpline)
                 #print ('moy profil : ', moy_profil)
-                if moy_profil <64000 :
-                
+                if moy_profil <64000 and not flag_corona :
+                    
                     #winterp=801 # en test, 101 ne corrige pas de nombreuses lignes en pack 
                     # test pour sunscan
                     #winterp=101 #version 6.7
@@ -1457,8 +1621,8 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
             el_ind_x2= np.argmax(elX)
             el_y_x1=elY[el_ind_x1]
             el_y_x2=elY[el_ind_x2]
-            #print('ellipse x1,x2 : ', el_x1, el_x2)
-            #print('ellipse y_x1,y_x2 : ', el_y_x1, el_y_x2)
+            # print('ellipse x1,x2 : ', el_x1, el_x2)
+            # print('ellipse y_x1,y_x2 : ', el_y_x1, el_y_x2)
             
             if k==0 :
                 el_x1_img=el_x1
@@ -1488,62 +1652,216 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
             #on force l'angle de tilt pour les prochaines images
             ang_tilt=AlphaDeg
 
+            if 1 == 1 : # correction de tilt de 7.0.3
     
-            #decale lignes images par rapport au centre
-            colref=round(((el_x2-el_x1)/2)+el_x1) # bug 27 mai 2026 mauvais calcul du centre
-            dymax=int(abs(TanAlpha)*(colref))
+                #decale lignes images par rapport au centre
+                xc = EllipseFit[0][0]
+                colref=xc
+                #colref=round(((el_x2-el_x1)/2)+el_x1) # bug 27 mai 2026 mauvais calcul du centre
+                dymax=int(abs(TanAlpha)*(colref))
+                
+                # calcul du background
+                # Taille de l'image
+                #ih, iw = img2.shape
+                
+                # Pré-calcul du percentile bas si nécessaire
+                if y1 <= 15 or y2 > ih - 15:
+                    perc15 = np.percentile(img2, 15)
+                
+                # Partie haute
+                if y1 <= 15:
+                    img_dark1 = np.full((2, iw), perc15)
+                else:
+                    img_dark1 = img2[0:10, :] 
+                
+                # Partie basse
+                if y2 > ih - 15:
+                    img_dark2 = np.full((2, iw), perc15)
+                else:
+                    img_dark2 = img2[-10:, :] 
+                
+                # Calculs des moyennes de remplissage (1D)
+                #img_fill1 = img_dark1.mean(axis=0)
+                #img_fill2 = img_dark2.mean(axis=0)
+                
+                # Fond basé sur l'ensemble des zones sombres
+                # Astuce : np.vstack évite un appel à np.concatenate avec tuple
+                img_dark = np.vstack((img_dark1, img_dark2))
+                background = np.percentile(img_dark, 55) 
+                
+                  
+                # Ajout de padding en haut et en bas
+                img2 = np.pad(img2, ((dymax, dymax), (0, 0)), mode='constant', constant_values=background)
+                ih, iw = img2.shape
+                crop=int((TanAlpha)*iw)
+                
+                # Grille de coordonnées
+                y = np.arange(ih)[:, None]   # forme (ih, 1)
+                x = np.arange(iw)[None, :]   # forme (1, iw)
+                dy = (x - colref) * TanAlpha # décalage vertical par colonne
+                
+                # Coordonnées à échantillonner
+                y_src = y - dy                     # (ih, iw)
+                x_src = np.broadcast_to(x, y_src.shape)
+                
+                # Interpolation bilinéaire (ordre=1)
+                NewImg = map_coordinates(img2, [y_src, x_src], order=1, cval=background)
+                
+                # Clamp à 0
+                NewImg[NewImg <= 0] = 0
             
-            # calcul du background
-            # Taille de l'image
-            #ih, iw = img2.shape
-            
-            # Pré-calcul du percentile bas si nécessaire
-            if y1 <= 15 or y2 > ih - 15:
-                perc15 = np.percentile(img2, 15)
-            
-            # Partie haute
-            if y1 <= 15:
-                img_dark1 = np.full((2, iw), perc15)
-            else:
-                img_dark1 = img2[0:10, :] 
-            
-            # Partie basse
-            if y2 > ih - 15:
-                img_dark2 = np.full((2, iw), perc15)
-            else:
-                img_dark2 = img2[-10:, :] 
-            
-            # Calculs des moyennes de remplissage (1D)
-            #img_fill1 = img_dark1.mean(axis=0)
-            #img_fill2 = img_dark2.mean(axis=0)
-            
-            # Fond basé sur l'ensemble des zones sombres
-            # Astuce : np.vstack évite un appel à np.concatenate avec tuple
-            img_dark = np.vstack((img_dark1, img_dark2))
-            background = np.percentile(img_dark, 55) 
-            
-              
-            # Ajout de padding en haut et en bas
-            img2 = np.pad(img2, ((dymax, dymax), (0, 0)), mode='constant', constant_values=background)
-            ih, iw = img2.shape
-            crop=int((TanAlpha)*iw)
-            
-            # Grille de coordonnées
-            y = np.arange(ih)[:, None]   # forme (ih, 1)
-            x = np.arange(iw)[None, :]   # forme (1, iw)
-            dy = (x - colref) * TanAlpha # décalage vertical par colonne
-            
-            # Coordonnées à échantillonner
-            y_src = y - dy                     # (ih, iw)
-            x_src = np.broadcast_to(x, y_src.shape)
-            
-            # Interpolation bilinéaire (ordre=1)
-            NewImg = map_coordinates(img2, [y_src, x_src], order=1, cval=background)
-            
-            # Clamp à 0
-            NewImg[NewImg <= 0] = 0
-        
-            img2=np.copy(NewImg)
+                img2=np.copy(NewImg)
+                
+                # calcul du ratio sans fit ellipse
+                xc = EllipseFit[0][0]
+                print("colref et xc "+ str(colref)+" , "+str(xc))
+                XE1 = XE.T[0].copy()
+                # tilt virtuel
+                YE1 = XE.T[1] + (XE.T[0] - xc) * TanAlpha
+                
+                # Diamètres après correction du tilt
+                width = np.percentile(XE1, 99.5) - np.percentile(XE1, 0.5)
+                height = np.percentile(YE1, 99.5) - np.percentile(YE1, 0.5)
+                
+                ratio = height / width
+
+            else :
+                # ---------------------------------------------------------
+                # Après calcul de TanAlpha
+                # ---------------------------------------------------------
+                
+                # Centre issu du fit ellipse
+                xc = EllipseFit[0][0]
+                yc = EllipseFit[0][1]
+                print ("centre : "+str(xc)+','+str(yc))
+                #colref=round(((el_x2-el_x1)/2)+el_x1)
+                #xc = colref       # idéalement remplacer par xc du fit ellipse
+                # yc doit venir du fit ellipse
+                # yc = ...
+                
+                # ---------------------------------------------------------
+                # 1) Correction virtuelle du tilt sur les points du limbe
+                # ---------------------------------------------------------
+                
+                XE1 = XE.T[0].copy()
+                # tilt
+                YE1 = XE.T[1] + (XE.T[0] - xc) * TanAlpha
+                
+                
+                # ==========================================================
+                # 2) Calcul du facteur de circularisation
+                # ==========================================================
+                
+                # Diamètres après correction du tilt
+                width = np.percentile(XE1, 99.5) - np.percentile(XE1, 0.5)
+                height = np.percentile(YE1, 99.5) - np.percentile(YE1, 0.5)
+                
+                
+                # facteur vertical pour rendre le disque circulaire
+                scale_y = width / height
+                
+                
+                ratio = height / width
+                
+                
+                
+                print(f"Tilt : {AlphaDeg:.3f} deg")
+                print(f"Rapport H/L avant correction : {ratio:.4f}")
+                print(f"Facteur Y appliqué : {scale_y:.4f}")
+                
+                
+                # ==========================================================
+                # 3) Transformation finale du contour
+                # ==========================================================
+                
+                # application de la circularisation
+                XE2 = XE1.copy()
+                YE2 = yc + scale_y * (YE1 - yc)
+                
+                
+                # nouvelle boîte englobante du disque corrigé
+                xmin = np.floor(XE2.min()).astype(int)
+                xmax = np.ceil(XE2.max()).astype(int)
+                
+                ymin = np.floor(YE2.min()).astype(int)
+                ymax = np.ceil(YE2.max()).astype(int)
+                
+                
+                newiw = xmax - xmin
+                newih = ymax - ymin
+                
+                
+                print("Nouvelle taille :", newiw, "x", newih)
+                
+                
+                # ==========================================================
+                # 4) Grille de sortie
+                # ==========================================================
+                
+                x_out = np.arange(newiw)[None, :]
+                y_out = np.arange(newih)[:, None]
+                
+                
+                # coordonnées dans l'image corrigée
+                Xcorr = x_out + xmin
+                Ycorr = y_out + ymin
+                
+                
+                # ==========================================================
+                # 5) Transformation inverse
+                #
+                # Directe :
+                #
+                # Xcorr = X
+                # Ycorr = yc + scale_y*(Y + (X-xc)*TanAlpha - yc)
+                #
+                # ==========================================================
+                
+                
+                # inverse circularisation
+                Y1 = yc + (Ycorr - yc) / scale_y
+                
+                
+                # inverse cisaillement
+                Ysrc = Y1 - (Xcorr - xc) * TanAlpha
+                
+                Xsrc = Xcorr
+                
+                
+                # ==========================================================
+                # 6) Interpolation
+                # ==========================================================
+                
+                # background
+                background = np.percentile(img2, 55)
+                
+                
+                NewImg = map_coordinates(
+                    img2,
+                    [
+                        Ysrc,
+                        Xsrc
+                    ],
+                    order=1,
+                    mode='constant',
+                    cval=background
+                )
+                
+                
+                NewImg[NewImg < 0] = 0
+                
+                
+                img2 = np.copy(NewImg)
+                
+                
+                # ==========================================================
+                # 7) Vérification
+                # ==========================================================
+                newiw = img2.shape[1]
+                newih = img2.shape[0]
+                
+                print("Nouvelle taille image :"+ str(newiw)+ " x "+str( newih))
+                
             
 
                    
@@ -1574,23 +1892,26 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         if k==1:
             ratio_fixe=ratio_fixe_d1
             
-        #if ratio_fixe==0:
+        
         if flag_force != True and not flag_nobords:
-            # methode fit ellipse pour calcul du ratio SY/SX
-            X = detect_edge (img2, zexcl=0.1,crop=crop, disp_log=False)
-            EllipseFit,XE=fit_ellipse(img2, X,disp_log=False)
-            
-            ratio=EllipseFit[2]/EllipseFit[1]
-       
-            
+            if 2==1 : # on a inclut la circularisation dans le tilt 
+                # methode fit ellipse pour calcul du ratio SY/SX
+                X = detect_edge (img2, zexcl=0.1,crop=crop, disp_log=False)
+                EllipseFit,XE=fit_ellipse(img2, X,disp_log=False)
+             
+                           
+                ratio=EllipseFit[2]/EllipseFit[1]
+           
+                
             if cfg.LG == 1:
                 logme('Facteur d\'echelle SY/SX : '+"{:+.4f}".format(ratio))
             else:
                 logme('Scaling SY/SX : '+"{:+.4f}".format(ratio))
             
             NewImg, newiw = circularise2_opt(img2,iw,ih,ratio)
-          
-        
+
+      
+    
         else:
             # Forcer le ratio SY/SX
             NewImg, newiw=circularise2_opt(img2,iw,ih,ratio_fixe)
@@ -1615,7 +1936,7 @@ def solex_proc(serfile,Shift, Flags, ratio_fixe,ang_tilt, poly, data_entete,ang_
         debug_SYSX=False
         
         if debug_SYSX==True:
-            # sauvegarde en fits de l'image tilt
+            # sauvegarde en fits de l'image ratio
             img2=np.array(NewImg, dtype='uint16')
             DiskHDU=fits.PrimaryHDU(NewImg,header=hdr)
             DiskHDU.writeto(basefich+img_suff[k]+'_sysx.fits', overwrite='True')        

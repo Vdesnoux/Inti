@@ -618,7 +618,7 @@ def detect_edge (myimg,zexcl, crop, disp_log):
         x2li=li_gr.argmin()
 
         
-        if 1==1 :
+        if 2==1 :
             if i in range(1795, 1800) :
             #if i in range(y1+ze1+3, y1+ze1+5) :
             #if x1 <2500 :
@@ -1322,7 +1322,7 @@ def translate_img (img_mean, poly):
     c=poly[2] # constante a y=0
     
     ih, iw = img_mean.shape
-    img_mean_redresse = np.zeros((ih,iw), dtype='uint16')
+    img_mean_redresse = np.zeros((ih,2*iw), dtype='uint16')
     #img_mean_redresse = np.copy (img_mean)
     
     
@@ -1340,7 +1340,7 @@ def translate_img (img_mean, poly):
         # on interpole
         #f=interp1d(np.arange(0,iw)-ecart[y],myline,kind='linear',fill_value="extrapolate")
         f=interp1d(np.arange(0,iw)-ecart[y],myline,kind='linear',fill_value=0, bounds_error=False)
-        interp_line = f(np.arange(0,iw))
+        interp_line = f(np.arange(0,2*iw))
         img_mean_redresse[y:y+1,:] = interp_line
 
     
@@ -1547,6 +1547,35 @@ def apply_transversalium_correction(image, R, median_projection):
     corrected_image = np.clip(corrected_image, 0, 65535).astype(np.uint16)
         
     return corrected_image
-    
 
+def img_rotate(frame, angle_rot, centreX, centreY, diam) :
+    # on copie l'image de travail et on recupere hauteur et largeur
+    fr_avant_rot=np.copy(frame)
+    hh,ww=fr_avant_rot.shape[:2]
+
+    if diam !=0 :
+        if diam>frame.shape[0] :
+            h_bande = int(abs((abs((np.sin(np.deg2rad(angle_rot))* diam)))-centreY)+20)
+            #bandeau= np.zeros((h_bande,frame.shape[1]), dtype='uint16')
+            n = 20
+            fond = np.median(frame[:n, :], axis=0).astype(np.uint16)
+           
+            bandeau = np.tile(fond, (h_bande, 1))
+            fr_avant_rot=np.vstack([bandeau, frame, bandeau])
+            hh,ww=fr_avant_rot.shape[:2]
+            centreX=fr_avant_rot.shape[1]//2 
+            centreY=fr_avant_rot.shape[0]//2 
+    
+    # calcul de la matrice de rotation, angle en degre
+    rotation_mat=cv2.getRotationMatrix2D((centreX,centreY),float(angle_rot),1.0)
+    
+    # application de la matrice de rotation
+    fill = int(np.median(frame[:min(20, frame.shape[0]), :]))
+    fr_rot=cv2.warpAffine(fr_avant_rot,rotation_mat,(ww,hh),flags=cv2.INTER_LINEAR,
+                          borderMode=cv2.BORDER_CONSTANT,borderValue=fill)
+    #fr_rot=cv2.warpAffine(fr_avant_rot,rotation_mat,(ww,hh),flags=cv2.INTER_LINEAR)
+    frame=np.array(fr_rot, dtype='uint16')
+    
+    return frame
+    
 
