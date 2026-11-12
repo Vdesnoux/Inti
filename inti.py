@@ -14,14 +14,20 @@ Version post 6.4 en 2025
 import sys
 import os
 import yaml as yaml
+#import psutil
 
 
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtWidgets import QApplication,QMainWindow,QFileDialog,QMessageBox, QListWidgetItem,QDockWidget,QWidget, QDialog
-from PySide6.QtCore import QFile, QLocale, QIODevice, Qt, QPoint, QRect, QSettings, QTranslator, Signal, QObject
+from PySide6.QtWidgets import (QApplication,QMainWindow,QFileDialog,
+                               QMessageBox, QListWidgetItem,QDockWidget,QWidget, QDialog,
+                               QVBoxLayout, QTableWidget,QTableWidgetItem, QHeaderView)
+from PySide6.QtCore import QFile, QLocale, QIODevice, QTranslator, Qt, QPoint, QRect, QSettings, QTranslator, Signal, QObject,QCoreApplication, QEvent
 from PySide6 import QtGui
 import pyqtgraph as pg
 from pyqtgraph import ImageView, PlotWidget
+
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 
 from astropy.io import fits
 import astropy.time
@@ -55,7 +61,9 @@ from pathlib import Path
 import time # only for measure
 
 import requests
-import matplotlib.pyplot as plt #only for debug
+#import matplotlib.pyplot as plt #only for debug
+from scipy.signal import find_peaks
+from scipy.interpolate import PchipInterpolator
 
 
 
@@ -83,6 +91,24 @@ version 7.1 publiée
 
 
 original_stdout = sys.stdout
+# Récupération du processus Python
+#process = psutil.Process(os.getpid())
+_histo_window = None
+
+def display_histo(img):
+
+    global _histo_window
+
+    _histo_window = HistoWindow(img)
+    _histo_window.show()
+
+"""
+def mem_usage(label=""):
+    mem = process.memory_info().rss / (1024 ** 2)
+
+    print(f"[MEM] {time.strftime('%H:%M:%S')} | "
+          f"{label:30s} | {mem:8.1f} Mo")
+"""
 
 class main_wnd_UI(QMainWindow) :
     def __init__(self, fichier = None, flag = None):
@@ -270,6 +296,9 @@ class main_wnd_UI(QMainWindow) :
         
         # force antialiasing option de pyqtgraph
         pg.setConfigOptions(antialias=True)
+
+        # mem process util
+        process = psutil.Process(os.getpid())
         
         # on affiche version
         print('INTI Version : ' + str(self.version))
@@ -984,6 +1013,7 @@ class main_wnd_UI(QMainWindow) :
     def inti_go(self) :
         
         self.t0=time.time()
+       
         if len(self.serfiles) == 0 :
             print(self.tr('Aucun fichier sélectionné'))
         else :
@@ -1170,7 +1200,7 @@ class main_wnd_UI(QMainWindow) :
     
     def inti_result(self, result):
         
-       
+      
         #frames, header, cercle, range_dec, geom, self.polynome
         frames =result[0]
         header = result[1]
@@ -1182,8 +1212,10 @@ class main_wnd_UI(QMainWindow) :
             
         print(' ')
         self.img_allclose()
-        self.display_images(self.serfile,frames,header,cercle,range_dec,self.ii)
         
+        self.display_images(self.serfile,frames,header,cercle,range_dec,self.ii)
+
+      
         t2=time.time()
         dt=t2-self.t0
         #print('Traitement : '+"{:.2f}".format(dt)+' s')
@@ -1210,6 +1242,7 @@ class main_wnd_UI(QMainWindow) :
     def inti_loop (self) :
         
         # on check si on doit boucler
+        
         index_ser = self.ii
         if   index_ser <= len(self.serfiles)-1:
             
@@ -1274,14 +1307,14 @@ class main_wnd_UI(QMainWindow) :
             if   index_ser == len(self.serfiles) and index_ser !=1 and flag_galerie:
                 self.mygalerie=galerie_wnd(self.image4, self.serfiles_short)
                 self.mygalerie.ui.show()                                                    
-        
+
 
     
     def display_images(self,serfile,frames,header,cercle,range_dec,ii) :
         # frames 0:raw, 1: recon aka disk
         suff = ['raw','disk','protus', 'clahe', 'cont', 'doppler']
         disks=[]
-        
+    
         
         # disk raw
         #-------------------------------------------------------------------
@@ -1315,7 +1348,10 @@ class main_wnd_UI(QMainWindow) :
             cv2.imwrite(self.basefich_comple+img_suffix+'_raw.png',disk_raw)
         else:
             img_suffix="_dp"+str(range_dec[0])
-        
+        del disk_raw
+        del Disk
+        del myspectrum
+
         # disk recon
         #---------------------------------------------------------------------
         # Lecture  image recon
@@ -1328,8 +1364,7 @@ class main_wnd_UI(QMainWindow) :
                 suff[1]='_dp'+v_str+'_cont'
         else :
             dp_str="_dp"+str.replace(str(range_dec[0]),".","_")
-            ImgFile=self.basefich+'_dp'+dp_str+'_recon.fits'
-           
+            ImgFile=self.basefich+'_dp'+dp_str+'_recon.fits'     
             
         hdulist = fits.open(ImgFile, memmap=False)
         hdu=hdulist[0]
@@ -1341,7 +1376,6 @@ class main_wnd_UI(QMainWindow) :
         if cercle[2]*2 > ih :
             self.ui.section_angP_auto_chk.setChecked(False)
            
-        
         frame1=np.copy(frames[0])
         frame_contrasted = seuil_image_dyn (frame1, 99.999, 0.05)
         frame_contrasted = np.array(frame_contrasted, dtype='uint16')
@@ -1353,6 +1387,7 @@ class main_wnd_UI(QMainWindow) :
         disks.append(frame_contrasted)
         #sauvegarde en png disk
         cv2.imwrite(self.basefich+img_suffix+'_'+suff[1]+'.png',frame_contrasted)
+        del frame1
         
         
         # disk protus # modif pour Qt après test 585
@@ -1381,6 +1416,8 @@ class main_wnd_UI(QMainWindow) :
             disks.append(frame_contrasted3)
             #sauvegarde en png seuils protus
             cv2.imwrite(self.basefich+img_suffix+'_protus.png',frame_contrasted3)
+            del fc3
+            del frame2
             
             
         # disk clahe
@@ -1394,6 +1431,8 @@ class main_wnd_UI(QMainWindow) :
         disks.append(cc)
         #sauvegarde en png de clahe
         cv2.imwrite(self.basefich_clahe+img_suffix+'_clahe.png',cc)
+        del cl1
+        del cc  
         
         # images doppler, continuum ou free, ou magnet, ou volume
         if len(frames) >1:
@@ -1408,6 +1447,8 @@ class main_wnd_UI(QMainWindow) :
                 # sauvegarde en png de continuum
                 v_str = str.replace(str(range_dec[len(range_dec)-1]),".","_")
                 cv2.imwrite(self.basefich+'_dp'+v_str+'_cont.png',frame_continuum)
+                del frame_continuum
+                del frameC
             
             if self.Flags["DOPCONT"] and self.ui.dop_groupbox.isChecked():
                 #on se tente une image couleur, en 8 bits
@@ -1443,6 +1484,8 @@ class main_wnd_UI(QMainWindow) :
                     i2= seuil_image_force (moy,Seuil_haut, Seuil_bas)
                     i1=seuil_image_force (frames[1],Seuil_haut, Seuil_bas)
                     i3=seuil_image_force(frames[2],Seuil_haut, Seuil_bas)
+                    del f1
+                    del f2
                     
                     # tableau pour sauvegarde des fits moy, dop1, dop2
                     moy_doppler = np.copy(i2)
@@ -1508,6 +1551,7 @@ class main_wnd_UI(QMainWindow) :
                         # on remplace l'image protus noir et blanc
                         disks[2]=img_doppler_ec
                
+               
                 except:
                     print (self.tr('Erreur image doppler.'))
                     flag_erreur_doppler=True
@@ -1521,6 +1565,10 @@ class main_wnd_UI(QMainWindow) :
                     img_doppler_ec_cv2 =  cv2.cvtColor(img_doppler_ec, cv2.COLOR_RGB2BGR)
                     cv2.imwrite(self.basefich+'_doppler'+dp_str+'.png',img_doppler_cv2)
                     cv2.imwrite(self.basefich+'_doppler_protus'+dp_str+'.png',img_doppler_ec_cv2)
+                    del img_doppler
+                    del img_doppler_cv2
+                    del img_doppler_ec
+                    del moy
     
             
             if self.Flags["POL"] :
@@ -1667,14 +1715,13 @@ class main_wnd_UI(QMainWindow) :
 # ------------------------------------------------------------------------------------
         self.img_list=[]
         self.myzoom_wnd=zoom_wnd()
-        
+
         #if len(disks)<=4 :
             #self.image4.append(disks[3])
         #else :
             #self.image4.append(disks[4])
         
         if self.Flags['zoom'] :
-            
             self.myzoom_wnd.show()
         posx0=50
         dx=self.myscreen_w//20
@@ -1685,6 +1732,9 @@ class main_wnd_UI(QMainWindow) :
             
             self.img_list.append(myimg)
             self.img_list[-1].show()
+            if suff[i]=="disk" :
+                #display_histo(disks[i])
+                pass
             if self.Flags['Couronne'] and suff[i]=="free" :
                 self.img_list[-1].set_img(disks[i],True)
             else:
@@ -1716,26 +1766,69 @@ class main_wnd_UI(QMainWindow) :
         # image contraste inversé
         # ------------------------
         #frame_sub=65535-frame_contrasted
-        frame = frame_contrasted - frame_contrasted.min()
-        frame_sub = frame.max() - frame        
-        if self.files_to_save['inv'] : cv2.imwrite(self.basefich+img_suffix+'_inv.png',frame_sub)
+        if self.files_to_save['inv'] : 
+            frame = frame_contrasted.copy().astype(np.float32)
+            """
+            # Définition des niveaux
+            low = np.percentile(frame, 0.5)
+            high = np.percentile(frame, 99.99)
+
+            # Normalisation et inversion
+            frame = np.clip(frame, low, high)
+            frame_sub = (high - frame) / (high - low) * 65535
+
+            frame_sub = frame_sub.astype(np.uint16)
+            """
+
+            x = frame.astype(np.float32) / 65535.0
+
+            # Courbe par morceaux
+
+            # trouve les valeurs de sortie correspondantes pour les points d'entrée
+            # Histogramme
+            hist, bins = np.histogram(x, bins=256, range=(0, 1))
+            cdf = np.cumsum(hist) / hist.sum()
+            # intensité à p60
+            i60 = np.percentile(x, 60)
+            ratio = i60/0.43
+            a60= int(54*ratio)
+            #print(i60, a60, ratio)
+            if a60>=20 or a60<=75 :
+                a60=50
+
+            
+            points_in = np.array([0, 18, 30,50, 70, 100])
+            points_out = np.array([0, 55, 75, a60, 10, 0])
+
+            # Courbe tonale
+            curve = PchipInterpolator(
+                points_in / 100,
+                points_out / 100
+            )
+
+            y = curve(x)
+
+            frame_sub = np.clip(y * 65535, 0, 65535).astype(np.uint16)
+            cv2.imwrite(self.basefich+img_suffix+'_inv.png',frame_sub)
+            del x
+            del y
         
-        # test mix mais c'est moche...        
-        frame_sub[frame_sub==65535]=1000
-        frame_combo=np.maximum(frame_contrasted3, frame_contrasted)
-        frame_combo[frame_combo==65535]=0        
-        if self.files_to_save['mix'] : cv2.imwrite(self.basefich+img_suffix+'_mix.png',frame_combo)
-        
-        
-        
+        # test mix mais c'est moche...
+        if self.files_to_save['mix'] :
+                 
+            frame_sub[frame_sub==65535]=1000
+            frame_combo=np.maximum(frame_contrasted3, frame_contrasted)
+            frame_combo[frame_combo==65535]=0     
+           
+            cv2.imwrite(self.basefich+img_suffix+'_mix.png',frame_combo)
+
         couleur = self.bass_entete['wave_label']
         
         # image disk colorisée
         # --------------------
         if self.files_to_save['color'] :
-            img_color = Colorise_Image(couleur, frame_contrasted, self.basefich, img_suffix)
-            #img_color = Colorise_Image(couleur, cce, basefich, img_suffix)
-        
+            Colorise_Image(couleur, frame_contrasted, self.basefich, img_suffix)
+
         # si pas de flag mode magneto et ou raie libre
         if self.Flags["POL"] != True  and  self.Flags["WEAK"] != True : 
             
@@ -1906,7 +1999,7 @@ class main_wnd_UI(QMainWindow) :
                 filename_gif=self.basefich+'.gif'
                 
                 self.frps = 1
-                self.gif_images=[]
+                gif_images=[]
                 # mp4
                 height,width = self.vol_images[0].shape
                 filename_mp4 = self.basefich+'.mp4'
@@ -1917,17 +2010,18 @@ class main_wnd_UI(QMainWindow) :
                     filename=self.basefich+'_dp'+str(i)+'.png'
                     img=cv2.imread(filename)
                     #img2=cv2.resize(img,(width, height),interpolation = cv2.INTER_AREA)
-                    self.gif_images.append(Image.fromarray(img))
+                    gif_images.append(Image.fromarray(img))
                     out.write(img)
                 
                 out.release()
-                im=self.gif_images[0]
-                im.save(filename_gif, save_all=True, append_images=self.gif_images[1:], duration=int(1/self.frps)*1000, loop=0)
-        
+                im=gif_images[0]
+                im.save(filename_gif, save_all=True, append_images=gif_images[1:], duration=int(1/self.frps)*1000, loop=0)
+                gif_images.clear()
+                del self.vol_images
                     
  # ------------------------------------------------------------------------------------      
  # sauvegarde les fits
- 
+
         frame2=np.copy(frames[0])
         if self.Flags['WEAK']:
             if flag_erreur_weak :
@@ -2017,7 +2111,97 @@ class main_wnd_UI(QMainWindow) :
             DiskHDU=fits.PrimaryHDU(frames,hdr_vol)
             DiskHDU.writeto(filename_3D, overwrite='True')
 
-    
+        del frame2
+        del frames
+        del disks
+        del frame_contrasted
+        del frame_contrasted3
+       
+        try : 
+            del moy
+        except :
+            pass
+        try :
+            del img_diff
+        except:
+            pass
+        try :
+            del frame
+        except:
+            pass        
+        try :
+            del img_weak
+        except:
+            pass        
+        try :
+            del frame_sub
+        except:
+            pass
+        try :
+            del frame_combo
+        except:
+            pass
+        try :
+            del framedec
+        except:
+            pass
+        try :
+            del frame_dec
+        except:
+            pass
+        try :
+            del frame2
+        except:
+            pass
+        try :
+            del frame3
+        except:
+            pass
+        try :
+            del frame0
+        except:
+            pass
+        try :
+            del fdec
+        except:
+            pass
+        try :
+            del sub_frame
+        except:
+            pass
+        try :
+            del img_doppler
+        except:
+            pass
+        try :
+            del moy_doppler
+        except:
+            pass
+        try :
+            del dop1
+        except:
+            pass
+        try :
+            del dop2
+        except:
+            pass
+        try :
+            del fr0
+        except:
+            pass
+        try :
+            del fr1
+        except:
+            pass
+        try :
+            del fr2
+        except:
+            pass
+
+        import gc
+        gc.collect()
+        
+
     def collect_data (self ):
         
         # Flags & Shifts
@@ -2305,18 +2489,31 @@ class main_wnd_UI(QMainWindow) :
             self.Flags['POL'] =True
         if app_tab == 'Doppler - Continuum' :
             self.Flags['DOPCONT'] =True
-        if app_tab == 'Séquence Doppler' or app_tab=='Doppler Sequence':
+        if app_tab == 'Séquence Doppler' or app_tab=='Doppler sequence':
             self.Flags['VOL'] =True
 
     def img_allclose (self):
         #print("all close")
-        
         try :
             if self.Flags['zoom'] :
                 self.myzoom_wnd.ui.close()
+                self.myzoom_wnd = None
             for f in self.img_list :
-                f.write_settings()    
-                f.ui.close()                         
+                try:
+                    f.write_settings()
+                    f.ui.close()
+                    f.ui.deleteLater()
+                except Exception as e:
+                    print("Erreur fermeture fenêtre :", e)  
+            
+            self.img_list.clear()
+            # Traiter les destructions différées Qt
+            QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            QApplication.processEvents()
+            import gc
+            gc.collect()   
+                   
+        
         except :
             pass
     
@@ -3715,6 +3912,105 @@ class shg_popup(QWidget):
         self.ui.close()
 
 # ----------------------------------------------------------------------------
+# class affichage outils histogramme
+#-----------------------------------------------------------------------------
+class HistoWindow(QDialog):
+
+    def __init__(self, img, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Histogramme")
+        self.resize(700, 480)
+
+        layout = QVBoxLayout(self)
+
+        values = np.asarray(img).astype(np.float64).ravel()
+
+        # Normalisation entre 0 et 1
+        vmin = values.min()
+        vmax = values.max()
+
+        if vmax > vmin:
+            norm = (values - vmin) / (vmax - vmin)
+        else:
+            norm = np.zeros_like(values)
+
+        # Percentiles
+        percentiles = [0, 20, 25, 45, 60, 90, 100]
+        
+
+        intensities = np.percentile(values, percentiles)
+        intensities_norm = (intensities - vmin) / (vmax - vmin) if vmax > vmin else np.zeros(len(percentiles))
+
+        # Histogramme
+        hist, bins = np.histogram(norm, bins=256, range=(0, 1))
+       
+        # Ignorer le pic des faibles intensités
+        ignore_low = 0.15
+
+        idx_min = int(ignore_low * len(hist))
+
+        # Maximum dans la partie restante
+        histo_max = hist[idx_min:].max()
+
+        # Figure
+        self.figure = Figure(figsize=(5, 2))
+        self.canvas = FigureCanvasQTAgg(self.figure)
+
+        layout.addWidget(self.canvas)
+
+        ax = self.figure.add_subplot(111)
+
+        ax.plot(
+            (bins[:-1] + bins[1:]) / 2,
+            hist,
+            linewidth=0.8
+        )
+
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, histo_max * 1.05)
+        ax.set_xlabel("Intensité normalisée")
+        ax.set_ylabel("Nombre de pixels")
+        ax.set_title("Histogramme")
+        ax.grid(True, alpha=0.25)
+
+        for p, intensity in zip(percentiles, intensities_norm):
+            ax.axvline(intensity, linestyle="--", linewidth=1, alpha=0.7)
+
+        self.figure.tight_layout()
+        self.canvas.draw()
+
+        # Tableau
+        table = QTableWidget(len(percentiles), 3)
+
+        table.setHorizontalHeaderLabels([
+            "Percentile (%)",
+            "Intensité normalisée",
+            "Intensité uint16"
+        ])
+
+        for row, (p, intensity, intensity_norm) in enumerate(
+            zip(percentiles, intensities, intensities_norm)
+        ):
+
+            items = [
+                str(p),
+                f"{intensity_norm:.4f}",
+                f"{intensity:.0f}"
+            ]
+
+            for col, value in enumerate(items):
+                table.setItem(row, col, QTableWidgetItem(value))
+
+        table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+
+        table.setMaximumHeight(210)
+        layout.addWidget(table)
+
+
+# ----------------------------------------------------------------------------
 # class galerie images à la fin d'un batch
 #-----------------------------------------------------------------------------
 class galerie_wnd(QDialog) :
@@ -4433,7 +4729,7 @@ def Colorise_Image (couleur, frame_contrasted, basefich, suff):
         
         print("Couleur : "+ str(couleur))
 
-        return img_color     
+        return  
 
 def seuil_image_dyn (frameC, percent_h, dyn_bas):
     sub_frame=frameC[5:,:-5]
