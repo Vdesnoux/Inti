@@ -69,7 +69,7 @@ from scipy.interpolate import PchipInterpolator
 
 
 """
-version 7.1 publiée
+version 7.1.0 publiée
 - ajout detect_edge gestion crop dans detect_bord pour gerer fort tilt et diffusé
 - si erreur detection inversions sur gong, affiche image gong original
 - bug debug couronne y1,y2  en dur
@@ -117,7 +117,7 @@ class main_wnd_UI(QMainWindow) :
         #super().__init__(parent)
         super(main_wnd_UI, self).__init__()
 
-        self.version ="7.1"
+        self.version ="7.1.0"
         #iv = ImageView # force le load d'ImageView avant QUILoader
         # ne change rien...
         
@@ -297,6 +297,8 @@ class main_wnd_UI(QMainWindow) :
         # force antialiasing option de pyqtgraph
         pg.setConfigOptions(antialias=True)
 
+        # mem process util
+        process = psutil.Process(os.getpid())
         
         # on affiche version
         print('INTI Version : ' + str(self.version))
