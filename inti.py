@@ -297,8 +297,6 @@ class main_wnd_UI(QMainWindow) :
         # force antialiasing option de pyqtgraph
         pg.setConfigOptions(antialias=True)
 
-        # mem process util
-        process = psutil.Process(os.getpid())
         
         # on affiche version
         print('INTI Version : ' + str(self.version))
